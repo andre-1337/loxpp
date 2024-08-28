@@ -1,0 +1,657 @@
+// The standard library for Lox++.
+// This implementation of Lox implements traits, alongside with abstract methods,
+// objects, arrays, namespaces, static methods, and a fairly complete standard
+// library that provides collections, some base traits that actually provide
+// functionality to the language and other useful constructs.
+
+// This standard library was updated at: 26/08/2024
+
+trait Throwable {
+    abstract fn message();
+    fn type() -> "Throwable";
+}
+
+trait Enumerable {
+    abstract fn size();
+    abstract fn is_empty();
+    abstract fn each(callback);
+}
+
+trait Iterable with Enumerable {
+    abstract fn next();
+    abstract fn has_next();
+}
+
+trait Comparable {
+    abstract fn compare(other);
+}
+
+trait Printable {
+    abstract fn to_string();
+}
+
+trait Serializable {
+    abstract fn serialize();
+    abstract fn deserialize(data);
+}
+
+trait Observable {
+    abstract fn add_observer(observer);
+    abstract fn remove_observer(observer);
+    abstract fn notify_observers(event);
+}
+
+trait Cloneable {
+    abstract fn clone();
+}
+
+class Error with Throwable {
+    fn init(msg) {
+        self.msg = msg;
+    }
+
+    fn message() -> self.msg;
+}
+
+namespace std {
+    namespace Collections {
+        class List with Enumerable, Cloneable, Printable {
+            fn init() {
+                self.elements = [];
+            }
+
+            fn from_list(list) {
+                let elems = self.elements;
+                self.elements.clear();
+
+                for elem in list {
+                    self.elements.insert(elem);
+                }
+
+                return self;
+            }
+
+            fn size() -> self.elements.len();
+
+            fn is_empty() -> self.elements.len() == 0;
+
+            fn each(callback) {
+                for element in self.elements {
+                    callback(element);
+                }
+            }
+
+            fn iterator() -> ListIterator(self);
+
+            fn add(element) -> self.elements.insert(element);
+
+            fn clone() -> List().from_list(self.elements);
+
+            fn to_string() {
+                let res = "[ ";
+                let last = true;
+
+                for elem in self.elements {
+                    if !last {
+                        res += ", ";
+                    }
+
+                    res += elem;
+                    last = false;
+                }
+
+                res += " ]";
+                return res;
+            }
+        }
+
+        class ListIterator with Iterable {
+            fn init(list) {
+                self.list = list;
+                self.index = 0;
+            }
+
+            fn next() {
+                if !self.has_next() return null;
+                let element = self.list.elements[self.index];
+                ++self.index;
+                return element;
+            }
+
+            fn has_next() {
+                return self.index < self.list.elements.len();
+            }
+
+            fn size() {
+                return self.list.len();
+            }
+
+            fn is_empty() {
+                return self.list.is_empty();
+            }
+
+            fn each(callback) {
+                for element in self.list.elements {
+                    callback(element);
+                }
+            }
+        }
+
+        class ListNode(value, next);
+
+        class LinkedList with Enumerable {
+            fn init() {
+                self.head = null;
+                self.tail = null;
+            }
+
+            fn size() {
+                let count = 0;
+                let current = self.head;
+
+                while current != null {
+                    ++count;
+                    current = current.next;
+                }
+
+                return count;
+            }
+
+            fn is_empty() -> self.head == null;
+
+            fn each(callback) {
+                let current = self.head;
+                while current != null {
+                    callback(current.value);
+                    current = current.next;
+                }
+            }
+
+            fn iterator() {
+                return LinkedListIterator(self);
+            }
+
+            fn add(value) {
+                let new_node = ListNode(value, null);
+                if self.head == null {
+                    self.head = new_node;
+                    self.tail = new_node;
+                } else {
+                    self.tail.next = new_node;
+                    self.tail = new_node;
+                }
+            }
+        }
+
+        class LinkedListIterator with Iterable {
+            fn init(list) {
+                self.list = list;
+                self.current = self.list.head;
+            }
+
+            fn has_next() {
+                return self.current != null;
+            }
+
+            fn next() {
+                if !self.has_next() return null;
+                let element = self.current.value;
+                self.current = self.current.next;
+                return element;
+            }
+
+            fn size() -> self.list.size();
+
+            fn is_empty() -> self.list.is_empty();
+
+            fn each(callback) {
+                let current = self.list.head;
+                while current != null {
+                    callback(current.value);
+                    current = current.next;
+                }
+            }
+        }
+
+        class Pair(key, value) with Printable {
+            fn to_string() {
+                return "Pair(" + self.key + ": " + self.value + ")";
+            }
+        }
+
+        class Map with Enumerable, Printable {
+            fn init() {
+                self.elements = [];
+            }
+
+            fn size() -> self.elements.len();
+
+            fn is_empty() -> self.elements.len() == 0;
+
+            fn each(callback) {
+                for element in self.elements {
+                    callback(element);
+                }
+            }
+
+            fn iterator() -> MapIterator(self);
+
+            fn get(key) {
+                for element in self.elements {
+                    if element.key == key return element.value;
+                }
+                return null;
+            }
+
+            fn set(key, value) {
+                for element in self.elements {
+                    if element.key == key {
+                        element.value = value;
+                        return;
+                    }
+                }
+                self.elements.insert(Pair(key, value));
+            }
+
+            fn remove(key) {
+                for element, index in self.elements {
+                    if self.elements[index] == key {
+                        self.elements.remove(index);
+                        return;
+                    }
+                }
+            }
+
+            fn to_string() {
+                let res = "{ ";
+                let last = true;
+
+                for elem in self.elements {
+                    if !last {
+                        res += ", ";
+                    }
+
+                    res = res + "'" + elem.key + "': " + elem.value;
+                    last = false;
+                }
+
+                res += " }";
+                return res;
+            }
+        }
+
+        class MapIterator with Iterable {
+            fn init(map) {
+                self.map = map;
+                self.index = 0;
+            }
+
+            fn has_next() -> self.index < self.map.size();
+
+            fn next() {
+                if !self.has_next() return null;
+                let element = self.map.elements[self.index];
+
+                ++self.index;
+                return element;
+            }
+
+            fn size() -> self.map.size();
+
+            fn is_empty() -> self.map.is_empty();
+
+            fn each(callback) {
+                for element in self.elements {
+                    callback(element);
+                }
+            }
+        }
+
+        class Range with Iterable, Printable {
+            fn init(start, end) {
+                self.start = start;
+                self.end = end;
+                self.current = start;
+            }
+
+            fn next() {
+                if (self.has_next()) {
+                    let result = self.current;
+                    self.current += 1;
+
+                    return result;
+                } else {
+                    return null;
+                }
+            }
+
+            fn has_next() {
+                return self.current < self.end;
+            }
+
+            fn size() {
+                return self.end - self.start + 1;
+            }
+
+            fn is_empty() {
+                return self.start > self.end;
+            }
+
+            fn each(callback) {
+                let value = self.start;
+                while value <= self.end {
+                    callback(value);
+                    value = value + 1;
+                }
+            }
+
+            fn to_string() {
+                return "[" + self.start + ":" + self.end + "]";
+            }
+        }
+
+        class Stack with Printable {
+            fn init() {
+                self.items = [];
+            }
+
+            fn push(item) {
+                self.items.insert(item);
+            }
+
+            fn pop() {
+                if self.items.is_empty() {
+                    throw Error("Stack is empty.");
+                }
+
+                return self.items.remove(self.items.len() - 1);
+            }
+
+            fn peek() {
+                if self.items.is_empty() {
+                    throw Error("Stack is empty.");
+                }
+
+                return self.items[self.items.len() - 1];
+            }
+
+            fn is_empty() -> self.items.is_empty();
+
+            fn to_string() {
+                let res = "[ ";
+                let last = true;
+
+                for elem in self.items {
+                    if !last {
+                        res += ", ";
+                    }
+
+                    res += elem;
+                    last = false;
+                }
+
+                res += " ]";
+                return res;
+            }
+        }
+    }
+
+    namespace Math {
+        fn abs(x) {
+            if x < 0 return -x;
+            else return x;
+        }
+
+        fn sqrt(x) -> x ** 0.5;
+
+        fn min(a, b) {
+            if a < b return a;
+            else return b;
+        }
+
+        fn max(a, b) {
+            if a > b return a;
+            else return b;
+        }
+
+        fn sin(x) -> ___sin___(x);
+
+        fn cos(x) -> ___cos___(x);
+
+        fn tan(x) -> ___tan___(x);
+
+        fn pow(base, exp) -> base ** exp;
+
+        fn ceil(x) {
+            let int_part = Math.int(x);
+            if x > int_part return int_part + 1;
+            else return int_part;
+        }
+
+        fn floor(x) {
+            let int_part = Math.int(x);
+            if x < int_part return int_part - 1;
+            else return int_part;
+        }
+
+        fn int(x) {
+            if x % 1 == 0 return x;
+
+            if x >= 0 return x - (x % 1);
+            else return x - (x % 1) + 1;
+        }
+
+        fn random() -> ___random___();
+
+        fn random_with_range(x, y) {
+            if x >= y return null;
+            return x + Math.random() * (y - x);
+        }
+
+        let PI = 3.141592653589793;
+        let Euler = 2.718281828459045;
+        let Phi = 1.6180339887498948;
+        let EulerMascheroni = 0.5772156649015328;
+        let Sqrt2 = 1.4142135623730951;
+        let Sqrt3 = 1.7320508075688772;
+        let Sqrt5 = 2.23606797749979;
+        let NLog2 = 0.6931471805599453;
+        let NLog10 = 2.3025850929940456;
+    }
+
+    class String with Printable {
+        fn init(value) {
+            self.value = value;
+        }
+
+        fn empty() {
+            return String("");
+        }
+
+        fn length() {
+            return self.value.length();
+        }
+
+        fn is_empty() {
+            return self.value.is_empty();
+        }
+
+        fn char_at(pos) {
+            return self.value.char_at(pos);
+        }
+
+        fn substring(start, end) {
+            return self.value.substring(start, end);
+        }
+
+        fn index_of(char) {
+            return self.value.index_of(char);
+        }
+
+        fn contains(str) {
+            return self.value.contains(str);
+        }
+
+        fn to_upper() {
+            return self.value.to_upper();
+        }
+
+        fn to_lower() {
+            return self.value.to_lower();
+        }
+
+        fn trim() {
+            return self.value.trim();
+        }
+
+        fn split(delimiter) {
+            return self.value.split(delimiter);
+        }
+
+        fn append(str) {
+            return self.value.append(str);
+        }
+
+        fn equals(other) {
+            return self.value.equals(other);
+        }
+
+        fn starts_with(value) {
+            return self.value.starts_with(value);
+        }
+
+        fn ends_with(value) {
+            return self.value.ends_with(value);
+        }
+
+        fn to_string() {
+            return self.value;
+        }
+    }
+
+    namespace System {
+        fn timer(time) {
+            let end_time = clock();
+            let elapsed = end_time - time;
+            println("Time elapsed: " + elapsed + "ms.");
+        }
+
+        fn sleep(time) -> ___sleep___(time);
+    }
+}
+
+class Result {
+    fn init(type, value, error) {
+        self.type = type;
+        self.value = value;
+        self.error = error;
+    }
+
+    static fn Ok(value) {
+        return Result("Ok", value, null);
+    }
+
+    static fn Err(error) {
+        return Result("Err", null, error);
+    }
+
+    fn is_ok() {
+        return self.type == "Ok";
+    }
+
+    fn is_err() {
+        return self.type == "Err";
+    }
+
+    fn unwrap() {
+        if self.is_err() {
+            throw Error("Called Result#unwrap() on an 'Err' value: " + self.error);
+        }
+
+        return self.value;
+    }
+
+    fn unwrap_or(default) {
+        if self.is_ok() return self.value;
+        return default;
+    }
+
+    fn map(transform) {
+        if self.is_ok() return Result.Ok(transform(self.value));
+        return self;
+    }
+
+    fn map_err(transform) {
+        if self.is_err() return Result.Err(transform(self.error));
+        return self;
+    }
+
+    fn and_then(callback) {
+        if self.is_ok() return callback(self.value);
+        return self;
+    }
+
+    fn or_else(callback) {
+        if self.is_err() return callback(self.error);
+        return self;
+    }
+}
+
+class Option {
+    fn init(type, value) {
+        self.type = type;
+        self.value = value;
+    }
+
+    static fn Some(value) {
+        return Option("Some", value);
+    }
+
+    static fn None() {
+        return Option("None", null);
+    }
+
+    fn is_some() {
+        return self.type == "Some";
+    }
+
+    fn is_none() {
+        return self.type == "None";
+    }
+
+    fn unwrap() {
+        if self.is_none() {
+            throw Error("Called Option#unwrap() on a 'None' value");
+        }
+
+        return self.value;
+    }
+
+    fn unwrap_or(default) {
+        if self.is_some() return self.value;
+        return default;
+    }
+
+    fn map(transform) {
+        if self.is_some() return Option.Some(transform(self.value));
+        return self;
+    }
+
+    fn filter(predicate) {
+        if self.is_some() && predicate(self.value) {
+            return self;
+        }
+
+        return Option.None();
+    }
+
+    fn and(option) {
+        if self.is_some() return option;
+        return Option.None();
+    }
+
+    fn or(option) {
+        if self.is_some() return self;
+        return option;
+    }
+}
