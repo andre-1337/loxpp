@@ -40,16 +40,11 @@ public class Scanner {
     keywords.put("abstract", ABSTRACT);
     keywords.put("typeof", TYPEOF);
     keywords.put("lazy", LAZY);
-    keywords.put("break", BREAK);
-    keywords.put("try", TRY);
     keywords.put("catch", CATCH);
     keywords.put("finally", FINALLY);
     keywords.put("namespace", NAMESPACE);
     keywords.put("using", USING);
     keywords.put("from", FROM);
-    keywords.put("coroutine", COROUTINE);
-    keywords.put("yield", YIELD);
-    keywords.put("resume", RESUME);
   }
 
   private final String source;

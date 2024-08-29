@@ -2,7 +2,7 @@
   <artifact name="loxpp:jar">
     <output-path>$PROJECT_DIR$/out/artifacts/loxpp_jar</output-path>
     <root id="root">
-      <element id="archive" name="lust.jar">
+      <element id="archive" name="loxpp.jar">
         <element id="module-output" name="loxpp" />
       </element>
     </root>

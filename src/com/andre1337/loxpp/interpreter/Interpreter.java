@@ -18,16 +18,19 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
   private static final Object uninitialized = new Object();
   public final Environment globals = new Environment();
   public Environment environment = globals;
+  private boolean silentExecution;
 
-  public Interpreter() {
+  public Interpreter(boolean silentExecution) {
+    this.silentExecution = silentExecution;
+
     globals.define("clock", new LoxNative.Clock());
     globals.define("___random___", new LoxNative.Random());
     globals.define("___sin___", new LoxNative.Sin());
     globals.define("___cos___", new LoxNative.Cos());
     globals.define("___tan___", new LoxNative.Tan());
-    globals.define("print", new LoxNative.Print());
-    globals.define("println", new LoxNative.Println());
-    globals.define("debug", new LoxNative.Debug());
+    globals.define("print", new LoxNative.Print(silentExecution));
+    globals.define("println", new LoxNative.Println(silentExecution));
+    globals.define("debug", new LoxNative.Debug(silentExecution));
     globals.define("___sleep___", new LoxNative.Sleep());
     globals.define("___to_string___", new LoxNative.ToString());
 
@@ -410,7 +413,6 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
   @Override
   public Void visitMatchCaseStmt(Stmt.MatchCase stmt) {
     if (matchValues(currentMatchValue, evaluate(stmt.pattern))) {
-      System.out.println(stmt.pattern);
       execute(stmt.statement);
     }
     return null;
@@ -653,8 +655,6 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
   @Override
   public Object visitArraySubscriptSetExpr(Expr.SubscriptSet expr) {
     Object indexee = evaluate(expr.indexee);
-
-    System.out.println(indexee instanceof Map<?, ?>);
 
     if (indexee instanceof Map<?, ?> dictionary) {
       Object index = evaluate(expr.index);

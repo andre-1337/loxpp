@@ -91,6 +91,12 @@ public abstract class LoxNative implements LoxCallable {
     }
 
     public static class Print extends LoxNative {
+        private boolean silentExecution;
+
+        public Print(boolean silentExecution) {
+            this.silentExecution = silentExecution;
+        }
+
         @Override
         public int arity() {
             return -1;
@@ -103,7 +109,9 @@ public abstract class LoxNative implements LoxCallable {
                 strings.add(Interpreter.stringify(arg));
             }
             String formattedString = String.join(" ", strings);
-            System.out.print(formattedString);
+
+            if (!silentExecution) System.out.print(formattedString);
+
             return null;
         }
 
@@ -114,6 +122,12 @@ public abstract class LoxNative implements LoxCallable {
     }
 
     public static class Println extends LoxNative {
+        private boolean silentExecution;
+
+        public Println(boolean silentExecution) {
+            this.silentExecution = silentExecution;
+        }
+
         @Override
         public int arity() {
             return -1;
@@ -126,7 +140,7 @@ public abstract class LoxNative implements LoxCallable {
                 strings.add(Interpreter.stringify(arg));
             }
             String formattedString = String.join(" ", strings);
-            System.out.println(formattedString);
+            if (!silentExecution) System.out.println(formattedString);
             return null;
         }
 
@@ -137,6 +151,12 @@ public abstract class LoxNative implements LoxCallable {
     }
 
     public static class Debug extends LoxNative {
+        private boolean silentExecution;
+
+        public Debug(boolean silentExecution) {
+            this.silentExecution = silentExecution;
+        }
+
         @Override
         public int arity() {
             return -1;
@@ -149,7 +169,7 @@ public abstract class LoxNative implements LoxCallable {
                 strings.add(Interpreter.stringify(arg));
             }
             String formattedString = String.join(" ", strings);
-            System.err.format("[debug] %s\n", formattedString);
+            if (!silentExecution) System.err.format("[debug] %s\n", formattedString);
             return null;
         }
 

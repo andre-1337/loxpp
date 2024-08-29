@@ -1,13 +1,17 @@
 package com.andre1337.loxpp.parser;
 
-import com.andre1337.loxpp.*;
+import com.andre1337.loxpp.Lox;
+import com.andre1337.loxpp.ast.Expr;
+import com.andre1337.loxpp.ast.Stmt;
 import com.andre1337.loxpp.lexer.Token;
-import com.andre1337.loxpp.ast.*;
 import com.andre1337.loxpp.lexer.TokenType;
 
-import static com.andre1337.loxpp.lexer.TokenType.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
-import java.util.*;
+import static com.andre1337.loxpp.lexer.TokenType.*;
 
 public class Parser {
   private static class ParseError extends RuntimeException {
@@ -934,7 +938,7 @@ public class Parser {
              RETURN, SUPER, THIS, TRUE, LET, WHILE,
              EXTENDS, IN, STATIC, MATCH, CASE, WITH,
              TRAIT, THROW, ENUM, IS, ABSTRACT, TYPEOF,
-             LAZY, BREAK, TRY, CATCH, FINALLY, NAMESPACE,
+             LAZY, TRY, CATCH, FINALLY, NAMESPACE,
              USING, FROM:
 
           return;
