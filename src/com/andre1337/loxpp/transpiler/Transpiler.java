@@ -4,10 +4,12 @@ import com.andre1337.loxpp.ast.Expr;
 import com.andre1337.loxpp.ast.Stmt;
 import com.andre1337.loxpp.classes.LoxLazy;
 import com.andre1337.loxpp.classes.RuntimeError;
+import com.andre1337.loxpp.lexer.Token;
 
+import java.util.ArrayList;
 import java.util.List;
 
-public class Transpiler implements Stmt.Visitor<Void>, Expr.Visitor<Void> {
+public class Transpiler implements Stmt.Visitor<Void>, Expr.Visitor<String> {
     public StringBuilder output;
 
     public Transpiler() {
@@ -35,6 +37,12 @@ public class Transpiler implements Stmt.Visitor<Void>, Expr.Visitor<Void> {
         stmt.accept(this);
     }
 
+    private void executeBody(Stmt.Block block) {
+        for (Stmt stmt : block.statements) {
+            execute(stmt);
+        }
+    }
+
     private Object getValue(Object obj) {
         if (obj instanceof LoxLazy lazy) {
             return lazy.get();
@@ -60,6 +68,28 @@ public class Transpiler implements Stmt.Visitor<Void>, Expr.Visitor<Void> {
 
     @Override
     public Void visitFunctionStmt(Stmt.Function stmt) {
+        String name = stmt.name.lexeme;
+        List<String> params = new ArrayList<>();
+        for (Token param : stmt.params) {
+            params.add(param.lexeme);
+        }
+
+        if (params.size() == 1) {
+            output.append(String.format("const %s = %s => {\n", name, params.getFirst()));
+            for (Stmt statement : stmt.body) {
+                execute(statement);
+            }
+            output.append("}\n\n");
+        } else {
+            String paramsString = params.toString();
+            String paramString = paramsString.substring(1).substring(0, paramsString.length() - 2);
+            output.append(String.format("const %s = (%s) => {\n", name, paramString));
+            for (Stmt statement : stmt.body) {
+                execute(statement);
+            }
+            output.append("}\n\n");
+        }
+
         return null;
     }
 
@@ -81,10 +111,35 @@ public class Transpiler implements Stmt.Visitor<Void>, Expr.Visitor<Void> {
 
     @Override
     public Void visitVarStmt(Stmt.Var stmt) {
-        if (stmt.initializer != null) {
-            output.append(String.format("let %s = %s;\n", stmt.name.lexeme, evaluate(stmt.initializer)));
-        } else {
-            output.append(String.format("let %s = null;\n", stmt.name.lexeme));
+        String name = stmt.name.lexeme;
+
+        switch (stmt.initializer) {
+            case Expr.Lambda lambda -> {
+                List<String> params = new ArrayList<>();
+                for (Token param : lambda.params) {
+                    params.add(param.lexeme);
+                }
+
+                if (params.size() == 1) {
+                    output.append(String.format("const %s = %s => {\n", name, params.getFirst()));
+                    for (Stmt statement : lambda.body) {
+                        execute(statement);
+                    }
+                    output.append("}\n\n");
+                } else {
+                    String paramsString = params.toString();
+                    String paramString = paramsString.substring(1).substring(0, paramsString.length() - 2);
+                    output.append(String.format("const %s = (%s) => {\n", name, paramString));
+                    for (Stmt statement : lambda.body) {
+                        execute(statement);
+                    }
+                    output.append("}\n\n");
+                }
+            }
+
+            case null -> output.append(String.format("let %s = null;\n\n", name));
+
+            default -> output.append(String.format("let %s = %s;\n\n", name, evaluate(stmt.initializer)));
         }
 
         return null;
@@ -130,7 +185,7 @@ public class Transpiler implements Stmt.Visitor<Void>, Expr.Visitor<Void> {
             idx++;
         }
 
-        output.append("});\n");
+        output.append("});\n\n");
 
         return null;
     }
@@ -166,12 +221,12 @@ public class Transpiler implements Stmt.Visitor<Void>, Expr.Visitor<Void> {
     }
 
     @Override
-    public Void visitAssignExpr(Expr.Assign expr) {
+    public String visitAssignExpr(Expr.Assign expr) {
         return null;
     }
 
     @Override
-    public Void visitBinaryExpr(Expr.Binary expr) {
+    public String visitBinaryExpr(Expr.Binary expr) {
         Object left = evaluate(expr.left);
 
         switch (expr.operator) {
@@ -187,102 +242,103 @@ public class Transpiler implements Stmt.Visitor<Void>, Expr.Visitor<Void> {
     }
 
     @Override
-    public Void visitCallExpr(Expr.Call expr) {
+    public String visitCallExpr(Expr.Call expr) {
         return null;
     }
 
     @Override
-    public Void visitGetExpr(Expr.Get expr) {
+    public String visitGetExpr(Expr.Get expr) {
         return null;
     }
 
     @Override
-    public Void visitGroupingExpr(Expr.Grouping expr) {
+    public String visitGroupingExpr(Expr.Grouping expr) {
         return null;
     }
 
     @Override
-    public Void visitLiteralExpr(Expr.Literal expr) {
+    public String visitLiteralExpr(Expr.Literal expr) {
+        return expr.value.toString();
+    }
+
+    @Override
+    public String visitLogicalExpr(Expr.Logical expr) {
         return null;
     }
 
     @Override
-    public Void visitLogicalExpr(Expr.Logical expr) {
+    public String visitSetExpr(Expr.Set expr) {
         return null;
     }
 
     @Override
-    public Void visitSetExpr(Expr.Set expr) {
+    public String visitSuperExpr(Expr.Super expr) {
         return null;
     }
 
     @Override
-    public Void visitSuperExpr(Expr.Super expr) {
+    public String visitThisExpr(Expr.This expr) {
+        output.append("this");
         return null;
     }
 
     @Override
-    public Void visitThisExpr(Expr.This expr) {
+    public String visitUnaryExpr(Expr.Unary expr) {
         return null;
     }
 
     @Override
-    public Void visitUnaryExpr(Expr.Unary expr) {
+    public String visitVariableExpr(Expr.Variable expr) {
         return null;
     }
 
     @Override
-    public Void visitVariableExpr(Expr.Variable expr) {
+    public String visitArrayExpr(Expr.Array expr) {
         return null;
     }
 
     @Override
-    public Void visitArrayExpr(Expr.Array expr) {
+    public String visitArraySubscriptGetExpr(Expr.SubscriptGet expr) {
         return null;
     }
 
     @Override
-    public Void visitArraySubscriptGetExpr(Expr.SubscriptGet expr) {
+    public String visitArraySubscriptSetExpr(Expr.SubscriptSet expr) {
         return null;
     }
 
     @Override
-    public Void visitArraySubscriptSetExpr(Expr.SubscriptSet expr) {
+    public String visitLambdaExpr(Expr.Lambda expr) {
         return null;
     }
 
     @Override
-    public Void visitLambdaExpr(Expr.Lambda expr) {
+    public String visitDictionaryExpr(Expr.Dictionary expr) {
         return null;
     }
 
     @Override
-    public Void visitDictionaryExpr(Expr.Dictionary expr) {
+    public String visitTypeofExpr(Expr.Typeof expr) {
         return null;
     }
 
     @Override
-    public Void visitTypeofExpr(Expr.Typeof expr) {
+    public String visitTupleLiteralExpr(Expr.TupleLiteral expr) {
         return null;
     }
 
     @Override
-    public Void visitTupleLiteralExpr(Expr.TupleLiteral expr) {
+    public String visitLazyExpr(Expr.Lazy expr) {
         return null;
     }
 
     @Override
-    public Void visitLazyExpr(Expr.Lazy expr) {
+    public String visitSpreadExpr(Expr.Spread expr) {
         return null;
     }
 
     @Override
-    public Void visitSpreadExpr(Expr.Spread expr) {
-        return null;
-    }
-
-    @Override
-    public Void visitTernaryExpr(Expr.Ternary expr) {
+    public String visitTernaryExpr(Expr.Ternary expr) {
         return null;
     }
 }

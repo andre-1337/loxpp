@@ -42,17 +42,13 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
     globals.define("Object", Map.class);
   }
 
-  public void interpret(List<Stmt> statements, boolean hasMain) {
+  public void interpret(List<Stmt> statements) {
     try {
       for (Stmt statement : statements) {
         execute(statement);
       }
     } catch (RuntimeError error) {
       Lox.runtimeError(error);
-    } catch (Return ret) {
-      if (hasMain && ret.value instanceof Double num) {
-        System.exit(num.intValue());
-      }
     }
   }
 

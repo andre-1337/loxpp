@@ -26,7 +26,7 @@ public class Lox {
   private static List<String> sourceFile;
 
   private static void checkFileExtension(String path) {
-    if (path.endsWith(".lox") || path.endsWith(".loxlib")) {
+    if (path.endsWith(".lox") || path.endsWith(".loxlib") || path.endsWith(".loxtest")) {
       return;
     } else {
       throw new RuntimeError(new Token(TokenType.EOF, "", null, 0, 0), "RuntimeError", "The provided file extension is not supported by Lox++.", "Please consider changing it to '.lox' if you're writing a program or '.loxlib' if you're writing a library.");
@@ -97,12 +97,8 @@ public class Lox {
     }
   }
 
-  private static void run(String source, String path) {
+  private static void run(String source, String ignored) {
     List<Stmt> statements = getStmts(source);
-    boolean isLib = path.endsWith(".loxlib");
-    boolean hasMain = false;
-    Stmt.Function main = null;
-
     if (hadError) return;
 
     Resolver resolver = new Resolver(interpreter);
@@ -110,29 +106,7 @@ public class Lox {
 
     if (hadError) return;
 
-    if (!isLib) {
-      for (Stmt stmt : statements) {
-        if (stmt instanceof Stmt.Function fn && fn.name.lexeme.equals("main")) {
-          if (!fn.params.isEmpty() && fn.params.getFirst().lexeme.equals("argc") && fn.params.get(1).lexeme.equals("argv")) {
-            main = fn;
-            hasMain = true;
-            break;
-          }
-
-          System.err.println("'main' function's signature must be 'fn main(argc, argv)'.");
-          return;
-        }
-      }
-
-      if (!hasMain) {
-        System.err.println("Program must contain a 'main' function with signature 'fn main(argc, argv)'.");
-        return;
-      }
-
-      interpreter.interpret(main.body, true);
-    }
-
-    interpreter.interpret(statements, false);
+    interpreter.interpret(statements);
     transpiler.transpile(statements);
     System.out.println(transpiler.getOutput());
   }
