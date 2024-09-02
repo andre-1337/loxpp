@@ -22,10 +22,6 @@ trait Iterable with Enumerable {
     abstract fn has_next();
 }
 
-trait Comparable {
-    abstract fn compare(other);
-}
-
 trait Printable {
     abstract fn to_string();
 }
@@ -672,19 +668,5 @@ class Option {
     fn or(option) {
         if self.is_some() return self;
         return option;
-    }
-}
-
-class CoolArrayImplementationThatUsesTheNewIndexableTrait with Indexable {
-    fn init(elements) {
-        self.elements = elements;
-    }
-
-    fn get(index) {
-        return self.elements[index];
-    }
-
-    fn set(index, value) {
-        self.elements[index] = value;
     }
 }
