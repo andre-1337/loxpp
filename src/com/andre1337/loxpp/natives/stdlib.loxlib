@@ -45,6 +45,18 @@ trait Cloneable {
     abstract fn clone();
 }
 
+trait Computable {
+    abstract fn _add(other);
+    abstract fn _sub(other);
+    abstract fn _mul(other);
+    abstract fn _div(other);
+}
+
+trait Comparable {
+    abstract fn _eq(other);
+    abstract fn _neq(other);
+}
+
 class Error with Throwable {
     fn init(msg) {
         self.msg = msg;
@@ -55,7 +67,7 @@ class Error with Throwable {
 
 namespace std {
     namespace Collections {
-        class List with Enumerable, Cloneable, Printable {
+        class List with Enumerable, Printable {
             fn init() {
                 self.elements = [];
             }
@@ -84,8 +96,6 @@ namespace std {
             fn iterator() -> ListIterator(self);
 
             fn add(element) -> self.elements.insert(element);
-
-            fn clone() -> List().from_list(self.elements);
 
             fn to_string() {
                 let res = "[ ";

@@ -355,8 +355,7 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
 
       case LoxInstance ignored -> {
         LoxInstance trait = (LoxInstance) evaluate(stmt.iterable);
-        LoxTrait iterableTrait = (LoxTrait) environment
-            .get(new Token(TokenType.IDENTIFIER, "Iterable", null, stmt.key.line, stmt.key.column));
+        LoxTrait iterableTrait = (LoxTrait) environment.get("Iterable");
 
         if (!trait.klass.hasTrait(iterableTrait)) {
           throw new RuntimeError(
@@ -417,8 +416,7 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
   @Override
   public Void visitThrowStmt(Stmt.Throw stmt) {
     LoxInstance thrown = (LoxInstance) evaluate(stmt.thrown);
-    LoxTrait errorTrait = (LoxTrait) environment
-        .get(new Token(TokenType.IDENTIFIER, "Throwable", null, stmt.keyword.line, stmt.keyword.column));
+    LoxTrait errorTrait = (LoxTrait) environment.get("Throwable");
 
     if (!thrown.klass.hasTrait(errorTrait)) {
       throw new RuntimeError(
@@ -687,10 +685,12 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
 
   private String getMethodName(TokenType op) {
     return switch (op) {
-      case PLUS -> "__add__";
-      case MINUS -> "__sub__";
-      case STAR -> "__mul__";
-      case SLASH -> "__div__";
+      case PLUS -> "_add";
+      case MINUS -> "_sub";
+      case STAR -> "_mul";
+      case SLASH -> "_div";
+      case EQUAL_EQUAL -> "_eq";
+      case BANG_EQUAL -> "_neq";
       case null, default -> null;
     };
   }
@@ -701,9 +701,32 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
     Object right = evaluate(expr.right);
 
     String operatorMethod = getMethodName(expr.operator.type);
-    if (left instanceof LoxInstance instance) {
-      if (operatorMethod != null && instance.klass.methods.containsKey(operatorMethod)) {
-        return instance.klass.methods.get(operatorMethod).bind(instance).call(this, List.of(right));
+    LoxTrait computableTrait = (LoxTrait) environment.get("Computable");
+    LoxTrait comparableTrait = (LoxTrait) environment.get("Comparable");
+
+    if (operatorMethod != null) {
+      if (operatorMethod.equals("_add") || operatorMethod.equals("_sub") || operatorMethod.equals("_mul") || operatorMethod.equals("_div")) {
+        if (left instanceof LoxInstance instance) {
+          if (!instance.klass.hasTrait(computableTrait)) {
+            throw new RuntimeError(instance.klass.token, "RuntimeError", "Class '" + instance.klass.name + "' does not implement trait 'Computable'.", "Consider implementing the 'Computable' trait and its methods: '_add', '_sub', '_mul' and '_div'.");
+          }
+
+          if (instance.klass.methods.containsKey(operatorMethod)) {
+            return instance.klass.methods.get(operatorMethod).bind(instance).call(this, List.of(right));
+          }
+        }
+      }
+
+      if (operatorMethod.equals("_eq") || operatorMethod.equals("_neq")) {
+        if (left instanceof LoxInstance instance) {
+          if (!instance.klass.hasTrait(comparableTrait)) {
+            throw new RuntimeError(instance.klass.token, "RuntimeError", "Class '" + instance.klass.name + "' does not implement trait 'Comparable'.", "Consider implementing the 'Comparable' trait and its methods: '_eq' and '_neq'.");
+          }
+
+          if (instance.klass.methods.containsKey(operatorMethod)) {
+            return instance.klass.methods.get(operatorMethod).bind(instance).call(this, List.of(right));
+          }
+        }
       }
     }
 
@@ -763,7 +786,7 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
           throw new RuntimeError(expr.operator, "RuntimeError", "Range bounds must be numbers.", null);
         }
 
-        LoxClass rangeClass = (LoxClass) environment.get(new Token(TokenType.IDENTIFIER, "Range", null, expr.operator.line, expr.operator.column));
+        LoxClass rangeClass = (LoxClass) environment.get("Range");
         return rangeClass.call(this, List.of(left, right));
 
       case null, default:

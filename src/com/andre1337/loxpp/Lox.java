@@ -70,8 +70,8 @@ public class Lox {
   private static void runFile(String path) throws IOException {
     byte[] bytes = Files.readAllBytes(Paths.get(path));
     String source = new String(bytes, Charset.defaultCharset());
-    sourceFile = Arrays.asList(source.split("\n"));
     loadStandardLibrary();
+    sourceFile = Arrays.asList(source.split("\n"));
     run(source, path);
 
     if (hadError) System.exit(65);
@@ -107,8 +107,7 @@ public class Lox {
     if (hadError) return;
 
     interpreter.interpret(statements);
-    transpiler.transpile(statements);
-    System.out.println(transpiler.getOutput());
+    //transpiler.transpile(statements);
   }
 
   private static List<Stmt> getStmts(String source) {

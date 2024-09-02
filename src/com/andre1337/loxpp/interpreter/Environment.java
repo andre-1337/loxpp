@@ -28,6 +28,12 @@ public class Environment {
     throw new RuntimeError(name, "RuntimeError", "Undefined variable '" + name.lexeme + "'.", null);
   }
 
+  // UNSAFE, but it's being properly used and saves a lot of clutter
+  public Object get(String name) {
+    if (enclosing != null) return enclosing.get(name);
+    return values.get(name);
+  }
+
   public void assign(Token name, Object value) {
     if (values.containsKey(name.lexeme)) {
       values.put(name.lexeme, value);
