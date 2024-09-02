@@ -642,7 +642,22 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
     Object indexee = evaluate(expr.indexee);
     Object index = evaluate(expr.index);
 
-    return (indexee instanceof LoxIndexable) ? ((LoxIndexable) indexee).get(expr.bracket, index) : null;
+    LoxTrait indexableTrait = (LoxTrait) environment.get("Indexable");
+    if (indexee instanceof LoxInstance instance) {
+      if (!instance.klass.hasTrait(indexableTrait)) {
+        throw new RuntimeError(instance.klass.token, "RuntimeError", "Class '" + instance.klass.name + "' does not implement trait 'Indexable'.", "Consider implementing the 'Indexable' trait and its methods: 'get' and 'set'.");
+      }
+
+      if (instance.klass.methods.containsKey("get")) {
+        return instance.klass.methods.get("get").bind(instance).call(this, List.of(index));
+      }
+    }
+
+    if (indexee instanceof LoxIndexable indexable) {
+      return indexable.get(expr.bracket, index);
+    }
+
+    throw new RuntimeError(expr.bracket, "RuntimeError", "Object cannot be indexable.", null);
   }
 
   @SuppressWarnings("unchecked")
@@ -650,23 +665,40 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
   public Object visitArraySubscriptSetExpr(Expr.SubscriptSet expr) {
     Object indexee = evaluate(expr.indexee);
 
-    if (indexee instanceof Map<?, ?> dictionary) {
-      Object index = evaluate(expr.index);
-      Object value = evaluate(expr.value);
+    switch (indexee) {
+      case Map<?, ?> dictionary -> {
+        Object index = evaluate(expr.index);
+        Object value = evaluate(expr.value);
 
-      ((Map<LoxString, Object>) dictionary).put((LoxString) index, value);
+        ((Map<LoxString, Object>) dictionary).put((LoxString) index, value);
 
-      return value;
-    } else if (indexee instanceof LoxIndexable indexable) {
-      Object index = evaluate(expr.index);
-      Object value = evaluate(expr.value);
+        return value;
+      }
+      case LoxIndexable indexable -> {
+        Object index = evaluate(expr.index);
+        Object value = evaluate(expr.value);
 
-      indexable.set(expr.bracket, index, value);
+        indexable.set(expr.bracket, index, value);
 
-      return value;
-    } else {
-      throw new RuntimeError(expr.bracket, "RuntimeError", "Variable is not indexable.", null);
+        return value;
+      }
+      case LoxInstance instance -> {
+        Object index = evaluate(expr.index);
+        Object value = evaluate(expr.value);
+
+        LoxTrait indexableTrait = (LoxTrait) environment.get("Indexable");
+        if (!instance.klass.hasTrait(indexableTrait)) {
+          throw new RuntimeError(instance.klass.token, "RuntimeError", "Class '" + instance.klass.name + "' does not implement trait 'Indexable'.", "Consider implementing the 'Indexable' trait and its methods: 'get' and 'set'.");
+        }
+
+        if (instance.klass.methods.containsKey("set")) {
+          return instance.klass.methods.get("set").bind(instance).call(this, List.of(index, value));
+        }
+      }
+      case null, default -> throw new RuntimeError(expr.bracket, "RuntimeError", "Variable is not indexable.", null);
     }
+
+    throw new RuntimeError(expr.bracket, "RuntimeError", "THIS CODE SHOULD BE UNREACHABLE!!!!!", "Please report this over at https://github.com/andre-1337/loxpp/issues/new");
   }
 
   @Override
@@ -691,6 +723,10 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
       case SLASH -> "_div";
       case EQUAL_EQUAL -> "_eq";
       case BANG_EQUAL -> "_neq";
+      case LESS -> "_lt";
+      case GREATER -> "_gt";
+      case LESS_EQUAL -> "_lte";
+      case GREATER_EQUAL -> "_gte";
       case null, default -> null;
     };
   }
@@ -717,7 +753,7 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
         }
       }
 
-      if (operatorMethod.equals("_eq") || operatorMethod.equals("_neq")) {
+      if (operatorMethod.equals("_eq") || operatorMethod.equals("_neq") || operatorMethod.equals("_lt") || operatorMethod.equals("_gt") || operatorMethod.equals("_lte") || operatorMethod.equals("_gte")) {
         if (left instanceof LoxInstance instance) {
           if (!instance.klass.hasTrait(comparableTrait)) {
             throw new RuntimeError(instance.klass.token, "RuntimeError", "Class '" + instance.klass.name + "' does not implement trait 'Comparable'.", "Consider implementing the 'Comparable' trait and its methods: '_eq' and '_neq'.");

@@ -55,6 +55,15 @@ trait Computable {
 trait Comparable {
     abstract fn _eq(other);
     abstract fn _neq(other);
+    abstract fn _lt(other);
+    abstract fn _gt(other);
+    abstract fn _lte(other);
+    abstract fn _gte(other);
+}
+
+trait Indexable {
+    abstract fn get(index);
+    abstract fn set(index, value);
 }
 
 class Error with Throwable {
@@ -663,5 +672,19 @@ class Option {
     fn or(option) {
         if self.is_some() return self;
         return option;
+    }
+}
+
+class CoolArrayImplementationThatUsesTheNewIndexableTrait with Indexable {
+    fn init(elements) {
+        self.elements = elements;
+    }
+
+    fn get(index) {
+        return self.elements[index];
+    }
+
+    fn set(index, value) {
+        self.elements[index] = value;
     }
 }
