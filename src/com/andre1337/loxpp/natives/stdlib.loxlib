@@ -72,7 +72,7 @@ class Error with Throwable {
 
 namespace std {
     namespace Collections {
-        class List with Enumerable, Printable {
+        class List with Enumerable, Printable, Indexable {
             fn init() {
                 self.elements = [];
             }
@@ -117,6 +117,14 @@ namespace std {
 
                 res += " ]";
                 return res;
+            }
+
+            fn get(index) {
+                return self.elements[index];
+            }
+
+            fn set(index, value) {
+                self.elements[index] = value;
             }
         }
 
@@ -322,49 +330,6 @@ namespace std {
             }
         }
 
-        class Range with Iterable, Printable {
-            fn init(start, end) {
-                self.start = start;
-                self.end = end;
-                self.current = start;
-            }
-
-            fn next() {
-                if (self.has_next()) {
-                    let result = self.current;
-                    self.current += 1;
-
-                    return result;
-                } else {
-                    return null;
-                }
-            }
-
-            fn has_next() {
-                return self.current < self.end;
-            }
-
-            fn size() {
-                return self.end - self.start + 1;
-            }
-
-            fn is_empty() {
-                return self.start > self.end;
-            }
-
-            fn each(callback) {
-                let value = self.start;
-                while value <= self.end {
-                    callback(value);
-                    value = value + 1;
-                }
-            }
-
-            fn to_string() {
-                return "[" + self.start + ":" + self.end + "]";
-            }
-        }
-
         class Stack with Printable {
             fn init() {
                 self.items = [];
@@ -552,6 +517,49 @@ namespace std {
         }
 
         fn sleep(time) -> ___sleep___(time);
+    }
+}
+
+class Range with Iterable, Printable {
+    fn init(start, end) {
+        self.start = start;
+        self.end = end;
+        self.current = start;
+    }
+
+    fn next() {
+        if (self.has_next()) {
+            let result = self.current;
+            self.current = self.current + 1;
+
+            return result;
+        } else {
+            return null;
+        }
+    }
+
+    fn has_next() {
+        return self.current <= self.end;
+    }
+
+    fn size() {
+        return self.end - self.start;
+    }
+
+    fn is_empty() {
+        return self.start >= self.end;
+    }
+
+    fn each(callback) {
+        let value = self.current;
+        while value < self.end {
+            callback(value);
+            value += 1;
+        }
+    }
+
+    fn to_string() {
+        return "[" + self.start + ":" + self.end + "]";
     }
 }
 

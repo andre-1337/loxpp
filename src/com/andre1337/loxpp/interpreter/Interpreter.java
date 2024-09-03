@@ -7,10 +7,7 @@ import com.andre1337.loxpp.classes.*;
 import com.andre1337.loxpp.lexer.Token;
 import com.andre1337.loxpp.lexer.TokenType;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
   private final Map<Expr, Integer> locals = new HashMap<>();
@@ -353,11 +350,11 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
         }
       }
 
-      case LoxInstance ignored -> {
-        LoxInstance trait = (LoxInstance) evaluate(stmt.iterable);
+      case LoxInstance instance -> {
         LoxTrait iterableTrait = (LoxTrait) environment.get("Iterable");
+        LoxClass klass = instance.klass;
 
-        if (!trait.klass.hasTrait(iterableTrait)) {
+        if (!klass.hasTrait(iterableTrait)) {
           throw new RuntimeError(
                   stmt.keyword,
                   "RuntimeError",
@@ -366,13 +363,14 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
           );
         }
 
-        Token nextToken = trait.klass.findMethod("next").declaration().name;
-        Object nextMethod = ((LoxCallable) trait.get(nextToken)).call(this, new ArrayList<>());
+        LoxFunction hasNext = klass.findMethod("has_next").bind(instance);
+        LoxFunction next = klass.findMethod("next").bind(instance);
 
-        while (nextMethod != null) {
-          environment.define(stmt.key.lexeme, nextMethod);
+        while ((boolean) hasNext.call(this, List.of())) {
+          Object currentValue = next.call(this, Collections.emptyList());
+          environment.define(stmt.key.lexeme, currentValue);
+
           executeBlock(stmt.body, environment);
-          nextMethod = ((LoxCallable) trait.get(nextToken)).call(this, new ArrayList<>());
         }
       }
 
@@ -824,9 +822,7 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
 
         LoxClass rangeClass = (LoxClass) environment.get("Range");
         return rangeClass.call(this, List.of(left, right));
-
-      case null, default:
-        return null;
+      case null, default: return null;
     }
   }
 
