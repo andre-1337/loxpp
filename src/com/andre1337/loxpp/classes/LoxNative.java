@@ -1,6 +1,7 @@
 package com.andre1337.loxpp.classes;
 
 import com.andre1337.loxpp.interpreter.Interpreter;
+import com.sun.net.httpserver.HttpServer;
 
 import java.util.*;
 
@@ -91,10 +92,7 @@ public abstract class LoxNative implements LoxCallable {
     }
 
     public static class Print extends LoxNative {
-        private boolean silentExecution;
-
-        public Print(boolean silentExecution) {
-            this.silentExecution = silentExecution;
+        public Print() {
         }
 
         @Override
@@ -108,10 +106,8 @@ public abstract class LoxNative implements LoxCallable {
             for (Object arg : arguments) {
                 strings.add(Interpreter.stringify(arg));
             }
-            String formattedString = String.join(" ", strings);
-
-            if (!silentExecution) System.out.print(formattedString);
-
+            String formattedString = String.join("", strings);
+            System.out.print(formattedString);
             return null;
         }
 
@@ -122,10 +118,7 @@ public abstract class LoxNative implements LoxCallable {
     }
 
     public static class Println extends LoxNative {
-        private boolean silentExecution;
-
-        public Println(boolean silentExecution) {
-            this.silentExecution = silentExecution;
+        public Println() {
         }
 
         @Override
@@ -139,8 +132,8 @@ public abstract class LoxNative implements LoxCallable {
             for (Object arg : arguments) {
                 strings.add(Interpreter.stringify(arg));
             }
-            String formattedString = String.join(" ", strings);
-            if (!silentExecution) System.out.println(formattedString);
+            String formattedString = String.join("", strings);
+            System.out.println(formattedString);
             return null;
         }
 
@@ -151,10 +144,7 @@ public abstract class LoxNative implements LoxCallable {
     }
 
     public static class Debug extends LoxNative {
-        private boolean silentExecution;
-
-        public Debug(boolean silentExecution) {
-            this.silentExecution = silentExecution;
+        public Debug() {
         }
 
         @Override
@@ -169,7 +159,7 @@ public abstract class LoxNative implements LoxCallable {
                 strings.add(Interpreter.stringify(arg));
             }
             String formattedString = String.join(" ", strings);
-            if (!silentExecution) System.err.format("[debug] %s\n", formattedString);
+            System.err.format("[debug] %s\n", formattedString);
             return null;
         }
 

@@ -518,6 +518,63 @@ namespace std {
 
         fn sleep(time) -> ___sleep___(time);
     }
+
+    namespace Network {
+        class AsyncClient {
+            fn init(host, port) {
+                self.host = host;
+                self.port = port;
+                self.socket = null;
+            }
+
+            fn async connect() {
+                self.socket = await ___socket_connect___(self.host, self.port);
+            }
+
+            fn async send(data) {
+                if self.socket == null { throw Error("Socket is not connected."); }
+                await ___socket_send___(self.socket, data);
+            }
+
+            fn async receive(buffer_size) {
+                if self.socket == null { throw Error("Socket is not connected."); }
+                return await ___socket_receive___(self.socket, buffer_size);
+            }
+
+            fn async close() {
+                if self.socket != null {
+                    await ___socket_close___(self.socket);
+                    self.socket = null;
+                }
+            }
+        }
+
+        class AsyncServer {
+            fn init(port) {
+                self.port = port;
+                self.server_socket = null;
+                self.client_socket = null;
+            }
+
+            fn async start() {
+                self.server_socket = await ___server_bind_and_listen___(self.port);
+            }
+
+            fn async accept() {
+                if self.server_socket == null { throw Error("Server socket is not initialized."); }
+                self.client_socket = await ___server_accept___(self.server_socket);
+                return self.client_socket;
+            }
+
+            fn async close() {
+                if self.server_socket != null {
+                    await ___server_close___(self.server_socket);
+                    self.server_socket = null;
+                    self.client_socket = null;
+                }
+            }
+        }
+    }
 }
 
 class Range with Iterable, Printable {

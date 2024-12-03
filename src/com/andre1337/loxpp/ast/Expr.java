@@ -49,6 +49,8 @@ public abstract class Expr {
     R visitSpreadExpr(Spread expr);
 
     R visitTernaryExpr(Ternary expr);
+
+    R visitAwaitExpr(Await expr);
   }
 
   public static class Assign extends Expr {
@@ -285,9 +287,10 @@ public abstract class Expr {
   }
 
   public static class Lambda extends Expr {
-    public Lambda(List<Token> params, List<Stmt> body) {
+    public Lambda(List<Token> params, List<Stmt> body, boolean isAsync) {
       this.params = params;
       this.body = body;
+      this.isAsync = isAsync;
     }
 
     @Override
@@ -297,6 +300,7 @@ public abstract class Expr {
 
     public final List<Token> params;
     public final List<Stmt> body;
+    public final boolean isAsync;
   }
 
   public static class Dictionary extends Expr {
@@ -379,6 +383,19 @@ public abstract class Expr {
     public final Expr condition;
     public final Expr thenBranch;
     public final Expr elseBranch;
+  }
+
+  public static class Await extends Expr {
+    public Await(Token keyword, Expr value) {
+      this.keyword = keyword;
+      this.value = value;
+    }
+
+    @Override
+    public <R> R accept(Visitor<R> visitor) { return visitor.visitAwaitExpr(this); }
+
+    public final Token keyword;
+    public final Expr value;
   }
 
   public abstract <R> R accept(Visitor<R> visitor);

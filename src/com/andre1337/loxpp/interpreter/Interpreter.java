@@ -7,7 +7,11 @@ import com.andre1337.loxpp.classes.*;
 import com.andre1337.loxpp.lexer.Token;
 import com.andre1337.loxpp.lexer.TokenType;
 
+import java.nio.channels.AsynchronousServerSocketChannel;
+import java.nio.channels.AsynchronousSocketChannel;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 
 public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
   private final Map<Expr, Integer> locals = new HashMap<>();
@@ -15,19 +19,16 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
   private static final Object uninitialized = new Object();
   public final Environment globals = new Environment();
   public Environment environment = globals;
-  private boolean silentExecution;
 
   public Interpreter(boolean silentExecution) {
-    this.silentExecution = silentExecution;
-
     globals.define("clock", new LoxNative.Clock());
     globals.define("___random___", new LoxNative.Random());
     globals.define("___sin___", new LoxNative.Sin());
     globals.define("___cos___", new LoxNative.Cos());
     globals.define("___tan___", new LoxNative.Tan());
-    globals.define("print", new LoxNative.Print(silentExecution));
-    globals.define("println", new LoxNative.Println(silentExecution));
-    globals.define("debug", new LoxNative.Debug(silentExecution));
+    globals.define("print", new LoxNative.Print());
+    globals.define("println", new LoxNative.Println());
+    globals.define("debug", new LoxNative.Debug());
     globals.define("___sleep___", new LoxNative.Sleep());
     globals.define("___to_string___", new LoxNative.ToString());
 
@@ -37,6 +38,141 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
     globals.define("Boolean", Boolean.class);
     globals.define("Array", LoxArray.class);
     globals.define("Object", Map.class);
+
+    // networking
+    globals.define("___socket_connect___", new LoxCallable() {
+      @Override
+      public int arity() {
+        return 2;
+      }
+
+      @Override
+      public Object call(Interpreter interpreter, List<Object> arguments) {
+        String host = ((LoxString) arguments.getFirst()).value;
+        int port = (int) (double) arguments.get(1);
+
+        return LoxAsyncSocket.___connect___(host, port);
+      }
+    });
+
+    globals.define("___socket_send___", new LoxCallable() {
+      @Override
+      public int arity() {
+        return 2;
+      }
+
+      @Override
+      public Object call(Interpreter interpreter, List<Object> arguments) {
+        AsynchronousSocketChannel socket = (AsynchronousSocketChannel) arguments.getFirst();
+        String data = ((LoxString) arguments.get(1)).value;
+
+        return LoxAsyncSocket.___send___(socket, data);
+      }
+    });
+
+    globals.define("___socket_receive___", new LoxCallable() {
+      @Override
+      public int arity() {
+        return 2;
+      }
+
+      @Override
+      public Object call(Interpreter interpreter, List<Object> arguments) {
+        AsynchronousSocketChannel socket = (AsynchronousSocketChannel) arguments.getFirst();
+        int bufferSize = (int) (double) arguments.get(1);
+
+        return LoxAsyncSocket.___receive___(socket, bufferSize);
+      }
+    });
+
+    globals.define("___socket_close___", new LoxCallable() {
+      @Override
+      public int arity() {
+        return 1;
+      }
+
+      @Override
+      public Object call(Interpreter interpreter, List<Object> arguments) {
+        AsynchronousSocketChannel socket = (AsynchronousSocketChannel) arguments.getFirst();
+        return LoxAsyncSocket.___close___(socket);
+      }
+    });
+
+    globals.define("___server_bind_and_listen___", new LoxCallable() {
+      @Override
+      public int arity() {
+        return 1;
+      }
+
+      @Override
+      public Object call(Interpreter interpreter, List<Object> arguments) {
+        int port = (int) (double) arguments.getFirst();
+        return LoxAsyncSocket.___bind_and_listen___(port);
+      }
+    });
+
+    globals.define("___server_accept___", new LoxCallable() {
+      @Override
+      public int arity() {
+        return 1;
+      }
+
+      @Override
+      public Object call(Interpreter interpreter, List<Object> arguments) {
+        AsynchronousServerSocketChannel serverSocket = (AsynchronousServerSocketChannel) arguments.getFirst();
+        return LoxAsyncSocket.___accept___(serverSocket);
+      }
+    });
+
+    globals.define("___server_close___", new LoxCallable() {
+      @Override
+      public int arity() {
+        return 1;
+      }
+
+      @Override
+      public Object call(Interpreter interpreter, List<Object> arguments) {
+        AsynchronousServerSocketChannel serverSocket = (AsynchronousServerSocketChannel) arguments.getFirst();
+        return LoxAsyncSocket.___close_server___(serverSocket);
+      }
+    });
+
+    // concurrency
+    globals.define("___channel_new___", new LoxCallable() {
+      @Override
+      public int arity() {
+        return 0;
+      }
+
+      @Override
+      public Object call(Interpreter interpreter, List<Object> arguments) {
+        return null;
+      }
+    });
+
+    globals.define("___channel_send___", new LoxCallable() {
+      @Override
+      public int arity() {
+        return 0;
+      }
+
+      @Override
+      public Object call(Interpreter interpreter, List<Object> arguments) {
+        return null;
+      }
+    });
+
+    globals.define("___channel_receive___", new LoxCallable() {
+      @Override
+      public int arity() {
+        return 0;
+      }
+
+      @Override
+      public Object call(Interpreter interpreter, List<Object> arguments) {
+        return null;
+      }
+    });
   }
 
   public void interpret(List<Stmt> statements) {
@@ -105,9 +241,9 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
       klass.addTrait(trait);
 
       try {
-        classImplementsMethodsFromTrait(klass, trait);
+        verifyMethods(klass, trait);
       } catch (RuntimeError error) {
-        throw new RuntimeError(stmt.name, "RuntimeError", error.getMessage(), null);
+        throw new RuntimeError(stmt.name, "RuntimeError", error.getMessage(), error.hint);
       }
 
       addNonAbstractMethods(klass, trait);
@@ -124,13 +260,13 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
   private LoxClass getClass(Stmt.Class stmt, LoxClass superclass) {
     Map<String, LoxFunction> methods = new HashMap<>();
     for (Stmt.Function method : stmt.methods) {
-      LoxFunction function = new LoxFunction(method, environment, method.name.lexeme.equals("init"), false);
+      LoxFunction function = new LoxFunction(method, environment, method.name.lexeme.equals("init"), false, method.isAsync);
       methods.put(method.name.lexeme, function);
     }
 
     Map<String, LoxFunction> staticMethods = new HashMap<>();
     for (Stmt.Function method : stmt.staticMethods) {
-      LoxFunction function = new LoxFunction(method, environment, false, false);
+      LoxFunction function = new LoxFunction(method, environment, false, false, method.isAsync);
       staticMethods.put(method.name.lexeme, function);
     }
 
@@ -138,7 +274,47 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
     return new LoxClass(meta, stmt.name.lexeme, stmt.name, superclass, methods, this);
   }
 
-  private void classImplementsMethodsFromTrait(LoxClass klass, LoxTrait trait) {
+  private void verifySignature(LoxFunction traitDef, LoxFunction classImpl) {
+    String classImplName = classImpl.declaration().name.lexeme;
+
+    if (classImplName.equals("init")) {
+      return;
+    }
+
+    if (traitDef.isAsync() != classImpl.isAsync()) {
+      throw new RuntimeError(
+              classImpl.declaration().name,
+              "RuntimeError",
+              "Method '" + classImplName + "' must " + (traitDef.isAsync() ? "be async." : "not be async."),
+              "Please consider " + (traitDef.isAsync() ? "adding" : "removing") + "the 'async' modifier from the implementation"
+      );
+    }
+
+    if (traitDef.declaration().params.size() != classImpl.declaration().params.size()) {
+      throw new RuntimeError(
+              classImpl.declaration().name,
+              "RuntimeError",
+              "Method '" + classImplName + "' has a mismatched parameter count.",
+              "The method should have " + traitDef.declaration().params.size() + " arguments, but it has " + classImpl.declaration().params.size() + " instead."
+      );
+    }
+
+    for (int i = 0; i < traitDef.declaration().params.size(); i++) {
+      String traitDefParamName = traitDef.declaration().params.get(i).lexeme;
+      String classImplParamName = classImpl.declaration().params.get(i).lexeme;
+
+      if (!traitDefParamName.equals(classImplParamName)) {
+        throw new RuntimeError(
+                classImpl.declaration().name,
+                "RuntimeError",
+                "Parameter name mismatch in method '" + classImplName + "'.",
+                "The name of the parameter should be '" + traitDefParamName + "', but it is '" + classImplParamName + "' instead."
+        );
+      }
+    }
+  }
+
+  private void verifyMethods(LoxClass klass, LoxTrait trait) {
     for (Map.Entry<String, LoxFunction> entry : trait.methods().entrySet()) {
       String methodName = entry.getKey();
       LoxFunction fn = entry.getValue();
@@ -148,6 +324,16 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
             "Class '" + klass.name + "' does not implement abstract method '" + fn.declaration().name.lexeme + "' from trait '" + trait.name().lexeme + "'.",
                 "Consider implementing the abstract method '" + fn.declaration().name.lexeme + "' from trait '" + trait.name().lexeme + "' in class '" + klass.name + "'."
         );
+      }
+
+      for (Map.Entry<String, LoxFunction> classEntry : klass.methods.entrySet()) {
+        LoxFunction classMethod = classEntry.getValue();
+
+        if (!trait.methods().containsKey(classMethod.declaration().name.lexeme)) {
+          return;
+        }
+
+        verifySignature(fn, classMethod);
       }
     }
   }
@@ -198,7 +384,7 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
         );
       }
 
-      LoxFunction function = new LoxFunction(method, environment, false, method.isAbstract);
+      LoxFunction function = new LoxFunction(method, environment, false, method.isAbstract, method.isAsync);
       methods.put(method.name.lexeme, function);
     }
 
@@ -215,7 +401,7 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
 
   @Override
   public Void visitFunctionStmt(Stmt.Function stmt) {
-    LoxFunction function = new LoxFunction(stmt, environment, false, false);
+    LoxFunction function = new LoxFunction(stmt, environment, false, false, stmt.isAsync);
     environment.define(stmt.name.lexeme, function);
     return null;
   }
@@ -518,6 +704,21 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
   }
 
   @Override
+  public Object visitAwaitExpr(Expr.Await expr) {
+    Object value = evaluate(expr.value);
+
+    if (!(value instanceof CompletableFuture promise)) {
+      throw new RuntimeError(expr.keyword, "RuntimeError", "Can only await a promise.", null);
+    }
+
+    try {
+      return promise.get();
+    } catch (InterruptedException | ExecutionException e) {
+      throw new RuntimeError(expr.keyword, "RuntimeError", "Failed to await promise: " + e.getMessage(), null);
+    }
+  }
+
+  @Override
   public Object visitTernaryExpr(Expr.Ternary expr) {
     Object condition = evaluate(expr.condition);
 
@@ -615,7 +816,19 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
   @Override
   public Object visitLambdaExpr(Expr.Lambda expr) {
     List<Token> params = new ArrayList<>(expr.params);
-    return new LoxFunction(new Stmt.Function(null, params, expr.body, false), environment, false, false);
+    return new LoxFunction(
+            new Stmt.Function(
+                    null,
+                    params,
+                    expr.body,
+                    false,
+                    false
+            ),
+            environment,
+            false,
+            false,
+            false
+    );
   }
 
   @Override
@@ -868,8 +1081,8 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
   public Object visitGetExpr(Expr.Get expr) {
     Object object = evaluate(expr.object);
 
-    if (object instanceof LoxInstance) {
-      return ((LoxInstance) object).get(expr.name);
+    if (object instanceof LoxInstance instance) {
+      return instance.get(expr.name);
     }
 
     if (object instanceof LoxArray array) {
@@ -1079,35 +1292,38 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
   }
 
   public static String stringify(Object object) {
-    if (object == null)
-      return "null";
-
-    if (object instanceof Double) {
-      String text = object.toString();
-      if (text.endsWith(".0")) {
-        text = text.substring(0, text.length() - 2);
+      switch (object) {
+          case null -> {
+              return "null";
+          }
+          case Double v -> {
+              String text = object.toString();
+              if (text.endsWith(".0")) {
+                  text = text.substring(0, text.length() - 2);
+              }
+              return text;
+          }
+          case Map<?, ?> dictionary -> {
+              StringBuilder sb = new StringBuilder();
+              sb.append("{ ");
+              boolean first = true;
+              for (Map.Entry<?, ?> entry : dictionary.entrySet()) {
+                  if (!first) {
+                      sb.append(", ");
+                  }
+                  first = false;
+                  sb.append(entry.getKey().toString())
+                          .append(": ")
+                          .append(stringify(entry.getValue()));
+              }
+              sb.append(" }");
+              return sb.toString();
+          }
+          default -> {
+          }
       }
-      return text;
-    }
 
-    if (object instanceof Map<?, ?> dictionary) {
-      StringBuilder sb = new StringBuilder();
-      sb.append("{ ");
-      boolean first = true;
-      for (Map.Entry<?, ?> entry : dictionary.entrySet()) {
-        if (!first) {
-          sb.append(", ");
-        }
-        first = false;
-        sb.append(entry.getKey().toString())
-                .append(": ")
-                .append(stringify(entry.getValue()));
-      }
-      sb.append(" }");
-      return sb.toString();
-    }
-
-    return object.toString();
+      return object.toString();
   }
 
   private Object getValue(Object obj) {

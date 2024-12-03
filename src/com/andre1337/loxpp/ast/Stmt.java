@@ -104,11 +104,12 @@ public abstract class Stmt {
   }
 
   public static class Function extends Stmt {
-    public Function(Token name, List<Token> params, List<Stmt> body, boolean isAbstract) {
+    public Function(Token name, List<Token> params, List<Stmt> body, boolean isAbstract, boolean isAsync) {
       this.name = name;
       this.params = params;
       this.body = body;
       this.isAbstract = isAbstract;
+      this.isAsync = isAsync;
     }
 
     @Override
@@ -120,6 +121,7 @@ public abstract class Stmt {
     public final List<Token> params;
     public final List<Stmt> body;
     public final boolean isAbstract;
+    public final boolean isAsync;
   }
 
   public static class If extends Stmt {

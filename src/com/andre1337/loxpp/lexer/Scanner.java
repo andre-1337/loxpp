@@ -41,10 +41,13 @@ public class Scanner {
     keywords.put("typeof", TYPEOF);
     keywords.put("lazy", LAZY);
     keywords.put("catch", CATCH);
-    keywords.put("finally", FINALLY);
     keywords.put("namespace", NAMESPACE);
     keywords.put("using", USING);
     keywords.put("from", FROM);
+    keywords.put("async", ASYNC);
+    keywords.put("await", AWAIT);
+    keywords.put("private", PRIVATE);
+    keywords.put("try", TRY);
   }
 
   private final String source;

@@ -8,7 +8,6 @@ import com.andre1337.loxpp.lexer.Token;
 import com.andre1337.loxpp.lexer.TokenType;
 import com.andre1337.loxpp.parser.Parser;
 import com.andre1337.loxpp.sema.Resolver;
-import com.andre1337.loxpp.transpiler.Transpiler;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -20,7 +19,6 @@ import java.util.*;
 
 public class Lox {
   private static final Interpreter interpreter = new Interpreter(false);
-  private static final Transpiler transpiler = new Transpiler();
   static boolean hadError = false;
   static boolean hadRuntimeError = false;
   private static List<String> sourceFile;

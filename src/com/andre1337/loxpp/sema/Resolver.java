@@ -345,6 +345,12 @@ public class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
   }
 
   @Override
+  public Void visitAwaitExpr(Expr.Await expr) {
+    resolve(expr.value);
+    return null;
+  }
+
+  @Override
   public Void visitTernaryExpr(Expr.Ternary expr) {
     resolve(expr.condition);
     resolve(expr.thenBranch);

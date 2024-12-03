@@ -67,7 +67,7 @@ public class Parser {
       if (match(CLASS))
         return classDeclaration();
       if (match(FN))
-        return function("function");
+        return function();
       if (match(LET))
         return destructuringDeclaration();
       if (match(TRAIT))
@@ -121,6 +121,7 @@ public class Parser {
                       ),
                       fields.stream().map(field -> new Token(IDENTIFIER, field.name.lexeme, null, 0, 0)).toList(),
                       body,
+                      false,
                       false
               )
       );
@@ -140,9 +141,11 @@ public class Parser {
       consume(LEFT_BRACE, "Expect '{' before class body.");
 
       while (!check(RIGHT_BRACE) && !isAtEnd()) {
+        boolean isPrivate = match(PRIVATE);
         boolean isStatic = match(STATIC);
         consume(FN, "Expect 'fn' keyword before method declaration.");
-        (isStatic ? staticMethods : methods).add(function("method"));
+        boolean isAsync = match(ASYNC);
+        (isStatic ? staticMethods : methods).add(function("method", isAsync));
       }
 
       consume(RIGHT_BRACE, "Expect '}' after class body.");
@@ -424,7 +427,12 @@ public class Parser {
     return new Stmt.Expression(expr);
   }
 
-  private Stmt.Function function(String kind) {
+  private Stmt function() {
+    boolean isAsync = match(ASYNC);
+    return function(isAsync ? "async function" : "function", isAsync);
+  }
+
+  private Stmt.Function function(String kind, boolean isAsync) {
     Token name = consume(IDENTIFIER, "Expect " + kind + " name.");
     List<Token> parameters = new ArrayList<>();
     List<Stmt> body = new ArrayList<>();
@@ -451,12 +459,15 @@ public class Parser {
       body = block();
     }
 
-    return new Stmt.Function(name, parameters, body, false);
+    return new Stmt.Function(name, parameters, body, false, isAsync);
   }
 
   private Stmt.Function traitMethod(boolean isAbstract) {
+    boolean isAsync;
+
     if (isAbstract) {
       consume(FN, "Expect 'fn' keyword before method name");
+      isAsync = match(ASYNC);
       Token name = consume(IDENTIFIER, "Expect trait method name.");
       consume(LEFT_PAREN, "Expect '(' after trait method name.");
 
@@ -464,9 +475,10 @@ public class Parser {
       parseParameters(parameters);
       consume(SEMICOLON, "Expect ';' after abstract trait method.");
 
-      return new Stmt.Function(name, parameters, null, isAbstract);
+      return new Stmt.Function(name, parameters, null, true, isAsync);
     } else if (match(FN)) {
-      return function("trait method");
+      isAsync = match(ASYNC);
+      return function("trait method", isAsync);
     }
 
     return null;
@@ -590,7 +602,8 @@ public class Parser {
   }
 
   private Expr lambda() {
-    consume(LEFT_PAREN, "Expect '(' after 'fn'.");
+    boolean isAsync = match(ASYNC);
+    consume(LEFT_PAREN, "Expect '(' after '" + (isAsync ? "async" : "fn") + "'.");
     List<Token> parameters = new ArrayList<>();
     List<Stmt> body = new ArrayList<>();
 
@@ -613,7 +626,7 @@ public class Parser {
       body = block();
     }
 
-    return new Expr.Lambda(parameters, body);
+    return new Expr.Lambda(parameters, body, isAsync);
   }
 
   private Expr typeof() {
@@ -876,6 +889,11 @@ public class Parser {
       return lazy();
     }
 
+    if (match(AWAIT)) {
+      Expr value = expression();
+      return new Expr.Await(previous(), value);
+    }
+
     throw error(peek(), "Expect expression.");
   }
 
@@ -934,13 +952,13 @@ public class Parser {
         return;
 
       switch (peek().type) {
-        case CLASS, ELSE, FALSE, FN, FOR, IF, NULL,
-             RETURN, SUPER, THIS, TRUE, LET, WHILE,
-             EXTENDS, IN, STATIC, MATCH, CASE, WITH,
-             TRAIT, THROW, ENUM, IS, ABSTRACT, TYPEOF,
-             LAZY, TRY, CATCH, FINALLY, NAMESPACE,
-             USING, FROM:
-
+        case CLASS, ELSE, FALSE, FN, FOR, IF,
+             NULL, RETURN, SUPER, THIS, TRUE,
+             LET, WHILE, EXTENDS, IN, STATIC,
+             MATCH, CASE, WITH, TRAIT, THROW,
+             ENUM, IS, ABSTRACT, TYPEOF, LAZY,
+             USING, CATCH, NAMESPACE, FROM,
+             TRY, ASYNC, AWAIT, PRIVATE:
           return;
       }
 
