@@ -264,7 +264,7 @@ public class LoxString {
             return methods.get(name.lexeme);
         }
 
-        throw new RuntimeError(name, "RuntimeError", "No such method.", null);
+        throw new RuntimeError(name, "RuntimeError", "No such method '" + name.lexeme + "'.", null);
     }
 
     @Override

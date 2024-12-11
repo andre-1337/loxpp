@@ -1,0 +1,25 @@
+trait Animal {
+    abstract fn perform_action();
+}
+
+class Cat with Animal {
+    fn init() {}
+
+    fn perform_action() {
+        println("Meow :3");
+    }
+}
+
+class Dog with Animal {
+    fn init() {}
+
+    fn perform_action() {
+        println("Woof!");
+    }
+}
+
+let cat = Cat();
+let dog = Dog();
+
+cat.perform_action();
+dog.perform_action();

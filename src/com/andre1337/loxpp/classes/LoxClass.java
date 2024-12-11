@@ -13,7 +13,14 @@ public class LoxClass extends LoxInstance implements LoxCallable {
   public final Map<String, LoxFunction> methods;
   public final Interpreter interpreter;
 
-  public LoxClass(LoxClass meta, String name, Token token, LoxClass superclass, Map<String, LoxFunction> methods, Interpreter interpreter) {
+  public LoxClass(
+          LoxClass meta,
+          String name,
+          Token token,
+          LoxClass superclass,
+          Map<String, LoxFunction> methods,
+          Interpreter interpreter
+  ) {
     super(meta);
 
     this.superclass = superclass;

@@ -56,7 +56,6 @@ public class LoxAsyncSocket {
             }
         });
     }
-
     // client methods >
 
     // < server methods

@@ -1,0 +1,13 @@
+let grades = [ 15, 17, 14, 19 ];
+
+fn grade_average(grades) {
+    let sum = 0;
+
+    for grade in grades {
+        sum = sum + grade;
+    }
+
+    return sum / grades.len();
+}
+
+println("The grade average is: ", grade_average(grades));

@@ -34,7 +34,7 @@ public enum TokenType {
   MATCH, CASE, WITH, TRAIT, THROW,
   ENUM, IS, ABSTRACT, TYPEOF, LAZY,
   USING, CATCH, NAMESPACE, FROM,
-  TRY, ASYNC, AWAIT, PRIVATE,
+  TRY, ASYNC, AWAIT,
 
   // Special tokens
   EOF,

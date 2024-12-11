@@ -519,16 +519,23 @@ namespace std {
         fn sleep(time) -> ___sleep___(time);
     }
 
-    namespace Network {
+    namespace Http {
         class AsyncClient {
             fn init(host, port) {
                 self.host = host;
                 self.port = port;
                 self.socket = null;
+                self.is_connected = null;
             }
 
             fn async connect() {
+                if self.is_connected {
+                    println("Already connected to server: ", self.host, ":", self.port);
+                    return;
+                }
+
                 self.socket = await ___socket_connect___(self.host, self.port);
+                self.is_connected = true;
             }
 
             fn async send(data) {
@@ -545,7 +552,19 @@ namespace std {
                 if self.socket != null {
                     await ___socket_close___(self.socket);
                     self.socket = null;
+                    self.is_connected = false;
+                } else {
+                    println("Socket is already closed.");
                 }
+            }
+
+            fn async reconnect() {
+                if self.socket != null {
+                    println("Reconnecting to '", self.host, ":", self.port, "'...");
+                    await self.close();
+                }
+
+                await self.connect();
             }
         }
 
@@ -553,25 +572,71 @@ namespace std {
             fn init(port) {
                 self.port = port;
                 self.server_socket = null;
-                self.client_socket = null;
+                self.client_sockets = [];
             }
 
             fn async start() {
+                if self.server_socket != null {
+                    println("Server is already running.");
+                    return;
+                }
+
                 self.server_socket = await ___server_bind_and_listen___(self.port);
+                println("Server started on port '", self.port, "'.");
             }
 
             fn async accept() {
                 if self.server_socket == null { throw Error("Server socket is not initialized."); }
-                self.client_socket = await ___server_accept___(self.server_socket);
-                return self.client_socket;
+                let client_socket = await ___server_accept___(self.server_socket);
+
+                self.client_sockets.insert(client_socket);
+                return client_socket;
+            }
+
+            fn async send_to_client(client_socket, data) {
+                if client_socket == null { throw Error("Client socket is not connected."); }
+                await ___socket_send___(client_socket, data);
+            }
+
+            fn async broadcast(data) {
+                for client in self.client_sockets {
+                    try {
+                        await self.send_to_client(client, data);
+                    } catch err {
+                        println("Failed to send to client: ", err);
+                    }
+                }
+            }
+
+            fn async receive_from_client(client_socket, buffer_size) {
+                if client_socket == null { throw Error("Client socket is not connected."); }
+                return await ___socket_receive___(client_socket, buffer_size);
+            }
+
+            fn async close_client(client_socket) {
+                if client_socket != null {
+                    await ___socket_close___(client_socket);
+                    self.client_sockets.pop();
+                    println("Client disconnected.");
+                }
             }
 
             fn async close() {
                 if self.server_socket != null {
+                    println("Shutting down server...");
+
+                    for client in self.client_sockets {
+                        await self.close_client(client);
+                    }
+
                     await ___server_close___(self.server_socket);
                     self.server_socket = null;
-                    self.client_socket = null;
+                    self.client_sockets = [];
                 }
+            }
+
+            fn active_clients() {
+                return self.client_sockets.len();
             }
         }
     }

@@ -714,7 +714,8 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
     try {
       return promise.get();
     } catch (InterruptedException | ExecutionException e) {
-      throw new RuntimeError(expr.keyword, "RuntimeError", "Failed to await promise: " + e.getMessage(), null);
+      System.out.println(Arrays.toString(e.getStackTrace()));
+      throw new RuntimeError(expr.keyword, "", e.getMessage(), null);
     }
   }
 
@@ -1152,7 +1153,8 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
     if (expr.value instanceof String string) {
       return new LoxString(this, string);
     } else {
-      return expr.value;}
+      return expr.value;
+    }
   }
 
   @Override

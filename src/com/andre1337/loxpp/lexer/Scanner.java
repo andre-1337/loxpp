@@ -46,7 +46,6 @@ public class Scanner {
     keywords.put("from", FROM);
     keywords.put("async", ASYNC);
     keywords.put("await", AWAIT);
-    keywords.put("private", PRIVATE);
     keywords.put("try", TRY);
   }
 

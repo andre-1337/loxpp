@@ -86,11 +86,10 @@ public abstract class Expr {
   }
 
   public static class Call extends Expr {
-    public Call(Expr callee, Token paren, List<Expr> arguments, Expr instance) {
+    public Call(Expr callee, Token paren, List<Expr> arguments) {
       this.callee = callee;
       this.paren = paren;
       this.arguments = arguments;
-      this.instance = instance;
     }
 
     @Override
@@ -101,7 +100,6 @@ public abstract class Expr {
     public final Expr callee;
     public final Token paren;
     public final List<Expr> arguments;
-    public final Expr instance;
   }
 
   public static class Get extends Expr {

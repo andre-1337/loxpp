@@ -1,8 +1,10 @@
 package com.andre1337.loxpp;
 
+import com.andre1337.loxpp.ast.Expr;
 import com.andre1337.loxpp.ast.Stmt;
 import com.andre1337.loxpp.classes.RuntimeError;
 import com.andre1337.loxpp.interpreter.Interpreter;
+import com.andre1337.loxpp.interpreter.Optimizer;
 import com.andre1337.loxpp.lexer.Scanner;
 import com.andre1337.loxpp.lexer.Token;
 import com.andre1337.loxpp.lexer.TokenType;
@@ -99,13 +101,17 @@ public class Lox {
     List<Stmt> statements = getStmts(source);
     if (hadError) return;
 
-    Resolver resolver = new Resolver(interpreter);
-    resolver.resolve(statements);
+    Optimizer optimizer = new Optimizer();
+    List<Stmt> optimized = optimizer.optimize(statements);
 
     if (hadError) return;
 
-    interpreter.interpret(statements);
-    //transpiler.transpile(statements);
+    Resolver resolver = new Resolver(interpreter);
+    resolver.resolve(optimized);
+
+    if (hadError) return;
+
+    interpreter.interpret(optimized);
   }
 
   private static List<Stmt> getStmts(String source) {

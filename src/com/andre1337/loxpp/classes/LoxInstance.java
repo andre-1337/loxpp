@@ -1,5 +1,6 @@
 package com.andre1337.loxpp.classes;
 
+import com.andre1337.loxpp.ast.Stmt;
 import com.andre1337.loxpp.lexer.Token;
 
 import java.util.*;
@@ -18,7 +19,10 @@ public class LoxInstance {
     }
 
     LoxFunction method = klass.findMethod(name.lexeme);
-    if (method != null) return method.bind(this);
+    if (method != null) {
+      return method.bind(this);
+    }
+
     throw new RuntimeError(name, "RuntimeError", "Undefined property '" + name.lexeme + "'.", null);
   }
 

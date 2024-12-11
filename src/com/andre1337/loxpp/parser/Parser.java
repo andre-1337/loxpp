@@ -6,10 +6,7 @@ import com.andre1337.loxpp.ast.Stmt;
 import com.andre1337.loxpp.lexer.Token;
 import com.andre1337.loxpp.lexer.TokenType;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import static com.andre1337.loxpp.lexer.TokenType.*;
 
@@ -141,7 +138,6 @@ public class Parser {
       consume(LEFT_BRACE, "Expect '{' before class body.");
 
       while (!check(RIGHT_BRACE) && !isAtEnd()) {
-        boolean isPrivate = match(PRIVATE);
         boolean isStatic = match(STATIC);
         consume(FN, "Expect 'fn' keyword before method declaration.");
         boolean isAsync = match(ASYNC);
@@ -180,7 +176,7 @@ public class Parser {
     if (match(IDENTIFIER)) {
       return forInStatement(keyword, previous());
     } else if (match(LEFT_PAREN)) {
-      return cStyleForStatement(previous());
+      return cStyleForStatement();
     } else {
       throw error(peek(), "Expect variable declaration or expression after 'for'.");
     }
@@ -201,29 +197,44 @@ public class Parser {
     return new Stmt.ForIn(keyword, key, value, expr, body);
   }
 
-  private Stmt cStyleForStatement(Token keyword) {
-    Stmt initializer = varDeclaration();
+  private Stmt cStyleForStatement() {
+    Stmt initializer;
+    if (match(SEMICOLON)) {
+      initializer = null;
+    } else if (match(LET)) {
+      initializer = varDeclaration();
+    } else {
+      initializer = expressionStatement();
+    }
 
     Expr condition = null;
     if (!check(SEMICOLON)) {
       condition = expression();
     }
-
     consume(SEMICOLON, "Expect ';' after loop condition.");
 
     Expr increment = null;
     if (!check(RIGHT_PAREN)) {
       increment = expression();
     }
+    consume(RIGHT_PAREN, "Expect ')' after for clauses.");
+    Stmt body = statement();
 
-    consume(RIGHT_PAREN, "Expect ')' after 'for' clauses.");
-    consume(LEFT_BRACE, "Expect '{' because 'for' body.");
-
-    List<Stmt> body = block();
+    if (increment != null) {
+      body = new Stmt.Block(
+              Arrays.asList(
+                      body,
+                      new Stmt.Expression(increment)));
+    }
 
     if (condition == null) condition = new Expr.Literal(true);
+    body = new Stmt.While(condition, body);
 
-    return new Stmt.For(keyword, initializer, condition, increment, body);
+    if (initializer != null) {
+      body = new Stmt.Block(Arrays.asList(initializer, body));
+    }
+
+    return body;
   }
 
   private Stmt ifStatement() {
@@ -293,17 +304,6 @@ public class Parser {
 
     consume(SEMICOLON, "Expect ';' after variable declaration.");
     return new Stmt.Var(name, initializer);
-  }
-
-  private List<Token> destructuringPattern() {
-    List<Token> keys = new ArrayList<>();
-
-    do {
-      keys.add(consume(IDENTIFIER, "Expect key name in destructuring expression."));
-    } while (match(COMMA));
-    consume(RIGHT_BRACE, "Expect '}' at the end of destructuring pattern.");
-
-    return keys;
   }
 
   private List<Expr> withClause() {
@@ -790,7 +790,7 @@ public class Parser {
 
     Token paren = consume(RIGHT_PAREN, "Expect ')' after arguments.");
 
-    return new Expr.Call(callee, paren, arguments, null);
+    return new Expr.Call(callee, paren, arguments);
   }
 
   private Expr finishIndexGet(Expr indexee) {
@@ -958,7 +958,7 @@ public class Parser {
              MATCH, CASE, WITH, TRAIT, THROW,
              ENUM, IS, ABSTRACT, TYPEOF, LAZY,
              USING, CATCH, NAMESPACE, FROM,
-             TRY, ASYNC, AWAIT, PRIVATE:
+             TRY, ASYNC, AWAIT:
           return;
       }
 
