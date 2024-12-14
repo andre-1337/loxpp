@@ -16,11 +16,10 @@ import java.util.concurrent.ExecutionException;
 public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
   private final Map<Expr, Integer> locals = new HashMap<>();
   private Object currentMatchValue = null;
-  private static final Object uninitialized = new Object();
   public final Environment globals = new Environment();
   public Environment environment = globals;
 
-  public Interpreter(boolean silentExecution) {
+  public Interpreter() {
     globals.define("clock", new LoxNative.Clock());
     globals.define("___random___", new LoxNative.Random());
     globals.define("___sin___", new LoxNative.Sin());
@@ -427,7 +426,7 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
 
   @Override
   public Void visitVarStmt(Stmt.Var stmt) {
-    Object value = uninitialized;
+    Object value = null;
 
     if (stmt.initializer != null) {
       value = evaluate(stmt.initializer);
@@ -823,12 +822,12 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
                     params,
                     expr.body,
                     false,
-                    false
+                    expr.isAsync
             ),
             environment,
             false,
             false,
-            false
+            expr.isAsync
     );
   }
 
@@ -1237,11 +1236,6 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
 
   @Override
   public Object visitVariableExpr(Expr.Variable expr) {
-    Object value = environment.get(expr.name);
-    if (value == uninitialized) {
-      throw new RuntimeError(expr.name, "RuntimeError", "Variable must be initialized before use.", null);
-    }
-
     return lookUpVariable(expr.name, expr);
   }
 
@@ -1298,7 +1292,7 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
           case null -> {
               return "null";
           }
-          case Double v -> {
+          case Double ignored -> {
               String text = object.toString();
               if (text.endsWith(".0")) {
                   text = text.substring(0, text.length() - 2);

@@ -414,6 +414,59 @@ namespace std {
             else return int_part;
         }
 
+        fn clamp(n, min, max) {
+            if n < min {
+                return min;
+            }
+
+            if n > max {
+                return max;
+            }
+
+            return n;
+        }
+
+        fn factorial(n) {
+            let res = 1;
+            let i = 2;
+
+            for (i = 2; i < n; i = i + 1) {
+                res = res * i;
+            }
+
+            return res;
+        }
+
+        fn gcd(n, other) {
+            let a = std.Math.abs(n);
+            let b = std.Math.abs(other);
+
+            while b != 0 {
+                let temp = b;
+                b = a % b;
+                a = temp;
+            }
+
+            return a;
+        }
+
+        fn lcm(n, other) {
+            return std.Math.abs(n * other) / std.Math.gcd(n, other);
+        }
+
+        fn exp(num) {
+            let result = 1;
+            let term = 1;
+            let n = 1;
+
+            for (n = 1; n < 20; n = n + 1) {
+                term = term * num / n;
+                result = result + term;
+            }
+
+            return result;
+        }
+
         fn int(x) {
             if x % 1 == 0 return x;
 

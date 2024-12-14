@@ -1,0 +1,7 @@
+let Person = {name: "John",age: 71,address: "Some St. 71st"};
+
+let { name, _, _ } = Person;
+println("Hello, ", name);
+
+let { _, age, address } = Person;
+println(name, " is ", age, " years old and lives in ", address);

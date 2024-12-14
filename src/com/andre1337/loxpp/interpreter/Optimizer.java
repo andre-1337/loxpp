@@ -219,6 +219,8 @@ public class Optimizer implements Expr.Visitor<Expr>, Stmt.Visitor<Stmt> {
         if (stmt.initializer != null) {
             if (stmt.initializer instanceof Expr.Binary bin) {
                 initializer = bin.accept(this);
+            } else {
+                initializer = stmt.initializer;
             }
         }
 

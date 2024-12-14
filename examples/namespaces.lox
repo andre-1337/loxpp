@@ -1,0 +1,19 @@
+namespace A {
+    fn a() -> 1;
+
+    namespace B {
+        fn b() -> 2;
+
+        namespace C {
+            fn c() -> 3;
+        }
+    }
+}
+
+println(A.a()); // 1
+
+using B from A;
+println(B.b()); // 2
+
+using C from B;
+println(C.c()); // 3

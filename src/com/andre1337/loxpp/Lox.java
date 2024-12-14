@@ -20,7 +20,7 @@ import java.nio.file.Paths;
 import java.util.*;
 
 public class Lox {
-  private static final Interpreter interpreter = new Interpreter(false);
+  private static final Interpreter interpreter = new Interpreter();
   static boolean hadError = false;
   static boolean hadRuntimeError = false;
   private static List<String> sourceFile;
