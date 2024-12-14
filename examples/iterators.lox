@@ -1,5 +1,5 @@
 let names = [ "Mariah", "Elton", "Michael", "John" ];
 
-for (name, i) in names {
+for name, i in names {
     println(i, ": ", name);
 }
