@@ -1,0 +1,80 @@
+let app = new Server();
+
+fn async main() {
+    app.use(fn async (req, res) {
+        println("[LOG]: New request -> method ${req.method} | path: ${req.path}");
+    });
+
+    app.use(fn async (req, res) {
+        if req.path == "/admin" {
+            println(req.query["password"]);
+            if req.query["password"] != "superdupersecretpassword" {
+                let error = { "error": "Access denied! Wrong password." };
+                await res.json(error);
+            }
+        }
+    });
+
+    app.get("/admin", fn async (req, res) {
+        await res.send("<h1>Welcome to the super duper secret database!</h1>");
+    });
+
+    app.get("/", fn async (req, res) {
+        await res.send_file("index.html");
+    });
+
+    app.get("/greet", fn async (req, res) {
+        await res.set_header("Content-Type: text/html; charset=utf-8");
+
+        let name = req.query["name"];
+        let age = req.query["age"];
+        let country = req.query["country"];
+        let html = "<h1> Hi ${name}!</h1>";
+        html = html + "<p>I see you are ${age} years old.</p>";
+        html = html + "<p>You are also from ${country}!</p>";
+
+        await res.send(html);
+    });
+
+    app.post("/api/login", fn async (req, res) {
+        if req.json != null {
+            let username = req.json["username"];
+            let response = {};
+
+            if username == "admin" {
+                response["status"] = "success";
+                response["message"] = "Welcome back!";
+                response["admin"] = true;
+                response["permissions"] = ["read", "write", "execute"];
+            } else {
+                response["status"] = "error";
+                response["message"] = "Who are you?";
+                response["admin"] = false;
+            }
+
+            await res.json(response);
+        } else {
+            let error = {};
+            error["status"] = "error";
+            error["message"] = "send json pls :P";
+            await res.json(error);
+        }
+    });
+
+    app.get("/profile/:username", fn async (req, res) {
+        let user = req.params["username"];
+
+        let response = {
+            "target": user,
+            "message": "This came from a dynamic route!"
+        };
+
+        await res.json(response);
+    });
+
+    await app.listen(8080, fn async (port) {
+        println(port);
+    });
+}
+
+await main();

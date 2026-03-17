@@ -1,0 +1,967 @@
+// LOXPP STANDARD LIBRARY VERSION 2
+// THIS IS THE COMPLETE IMPLEMENTATION OF LOXPP'S STANDARD LIBRARY
+// CONTAINS OBJECTS VITAL TO THE CORE LANGUAGE
+// LAST UPDATED: 19/02/2026
+
+trait Throwable {
+    abstract fn message();
+    fn type() -> "Throwable";
+}
+
+trait Enumerable {
+    abstract fn size();
+    abstract fn is_empty();
+    abstract fn each(callback);
+}
+
+trait Iterable with Enumerable {
+    abstract fn next();
+    abstract fn has_next();
+}
+
+trait Printable {
+    abstract fn to_string();
+}
+
+trait Serializable {
+    abstract fn serialize();
+    abstract fn deserialize(data);
+}
+
+trait Observable {
+    abstract fn add_observer(observer);
+    abstract fn remove_observer(observer);
+    abstract fn notify_observers(event);
+}
+
+trait Cloneable {
+    abstract fn clone();
+}
+
+trait Computable {
+    abstract fn _add(other);
+    abstract fn _sub(other);
+    abstract fn _mul(other);
+    abstract fn _div(other);
+}
+
+trait Comparable {
+    abstract fn _eq(other);
+    abstract fn _neq(other);
+    abstract fn _lt(other);
+    abstract fn _gt(other);
+    abstract fn _lte(other);
+    abstract fn _gte(other);
+}
+
+trait Indexable {
+    abstract fn get(index);
+    abstract fn set(index, value);
+}
+
+class Error with Throwable {
+    fn init(msg) {
+        self.msg = msg;
+    }
+
+    fn message() -> self.msg;
+}
+
+namespace std {
+    namespace Collections {
+        class List with Enumerable, Printable, Indexable {
+            fn init() {
+                self.elements = [];
+            }
+
+            fn from_list(list) {
+                let elems = self.elements;
+                self.elements.clear();
+
+                for elem in list {
+                    self.elements.insert(elem);
+                }
+
+                return self;
+            }
+
+            fn size() -> self.elements.len();
+
+            fn is_empty() -> self.elements.len() == 0;
+
+            fn each(callback) {
+                for element in self.elements {
+                    callback(element);
+                }
+            }
+
+            fn iterator() -> new ListIterator(self);
+
+            fn add(element) -> self.elements.insert(element);
+
+            fn to_string() {
+                let res = "[ ";
+                let last = true;
+
+                for elem in self.elements {
+                    if !last {
+                        res += ", ";
+                    }
+
+                    res += elem;
+                    last = false;
+                }
+
+                res += " ]";
+                return res;
+            }
+
+            fn get(index) {
+                return self.elements[index];
+            }
+
+            fn set(index, value) {
+                self.elements[index] = value;
+            }
+        }
+
+        class ListIterator with Iterable {
+            fn init(list) {
+                self.list = list;
+                self.index = 0;
+            }
+
+            fn next() {
+                if !self.has_next() return null;
+                let element = self.list.elements[self.index];
+                ++self.index;
+                return element;
+            }
+
+            fn has_next() {
+                return self.index < self.list.elements.len();
+            }
+
+            fn size() {
+                return self.list.len();
+            }
+
+            fn is_empty() {
+                return self.list.is_empty();
+            }
+
+            fn each(callback) {
+                for element in self.list.elements {
+                    callback(element);
+                }
+            }
+        }
+
+        class ListNode(value, next);
+
+        class LinkedList with Enumerable {
+            fn init() {
+                self.head = null;
+                self.tail = null;
+            }
+
+            fn size() {
+                let count = 0;
+                let current = self.head;
+
+                while current != null {
+                    ++count;
+                    current = current.next;
+                }
+
+                return count;
+            }
+
+            fn is_empty() -> self.head == null;
+
+            fn each(callback) {
+                let current = self.head;
+                while current != null {
+                    callback(current.value);
+                    current = current.next;
+                }
+            }
+
+            fn iterator() -> new LinkedListIterator(self);
+
+            fn add(value) {
+                let new_node = new ListNode(value, null);
+                if self.head == null {
+                    self.head = new_node;
+                    self.tail = new_node;
+                } else {
+                    self.tail.next = new_node;
+                    self.tail = new_node;
+                }
+            }
+        }
+
+        class LinkedListIterator with Iterable {
+            fn init(list) {
+                self.list = list;
+                self.current = self.list.head;
+            }
+
+            fn has_next() {
+                return self.current != null;
+            }
+
+            fn next() {
+                if !self.has_next() return null;
+                let element = self.current.value;
+                self.current = self.current.next;
+                return element;
+            }
+
+            fn size() -> self.list.size();
+
+            fn is_empty() -> self.list.is_empty();
+
+            fn each(callback) {
+                let current = self.list.head;
+                while current != null {
+                    callback(current.value);
+                    current = current.next;
+                }
+            }
+        }
+
+        class Pair(key, value) with Printable {
+            fn to_string() {
+                return "Pair(" + self.key + ": " + self.value + ")";
+            }
+        }
+
+        class Map with Enumerable, Printable {
+            fn init() {
+                self.elements = [];
+            }
+
+            fn size() -> self.elements.len();
+
+            fn is_empty() -> self.elements.len() == 0;
+
+            fn each(callback) {
+                for element in self.elements {
+                    callback(element);
+                }
+            }
+
+            fn iterator() -> new MapIterator(self);
+
+            fn get(key) {
+                for element in self.elements {
+                    if element.key == key return element.value;
+                }
+                return null;
+            }
+
+            fn set(key, value) {
+                for element in self.elements {
+                    if element.key == key {
+                        element.value = value;
+                        return;
+                    }
+                }
+                self.elements.insert(new Pair(key, value));
+            }
+
+            fn remove(key) {
+                for element, index in self.elements {
+                    if self.elements[index] == key {
+                        self.elements.remove(index);
+                        return;
+                    }
+                }
+            }
+
+            fn to_string() {
+                let res = "{ ";
+                let last = true;
+
+                for elem in self.elements {
+                    if !last {
+                        res += ", ";
+                    }
+
+                    res = res + "'" + elem.key + "': " + elem.value;
+                    last = false;
+                }
+
+                res += " }";
+                return res;
+            }
+        }
+
+        class MapIterator with Iterable {
+            fn init(map) {
+                self.map = map;
+                self.index = 0;
+            }
+
+            fn has_next() -> self.index < self.map.size();
+
+            fn next() {
+                if !self.has_next() return null;
+                let element = self.map.elements[self.index];
+
+                ++self.index;
+                return element;
+            }
+
+            fn size() -> self.map.size();
+
+            fn is_empty() -> self.map.is_empty();
+
+            fn each(callback) {
+                for element in self.elements {
+                    callback(element);
+                }
+            }
+        }
+
+        class Stack with Printable {
+            fn init() {
+                self.items = [];
+            }
+
+            fn push(item) {
+                self.items.insert(item);
+            }
+
+            fn pop() {
+                if self.items.is_empty() {
+                    throw new Error("Stack is empty.");
+                }
+
+                return self.items.remove(self.items.len() - 1);
+            }
+
+            fn peek() {
+                if self.items.is_empty() {
+                    throw new Error("Stack is empty.");
+                }
+
+                return self.items[self.items.len() - 1];
+            }
+
+            fn is_empty() -> self.items.is_empty();
+
+            fn to_string() {
+                let res = "[ ";
+                let last = true;
+
+                for elem in self.items {
+                    if !last {
+                        res += ", ";
+                    }
+
+                    res += elem;
+                    last = false;
+                }
+
+                res += " ]";
+                return res;
+            }
+        }
+
+        export List, ListIterator, ListNode, LinkedList, LinkedListIterator, Pair, Map, MapIterator, Stack;
+    }
+
+    namespace Math {
+        fn abs(x) {
+            if x < 0 return -x;
+            else return x;
+        }
+
+        fn sqrt(x) -> x ** 0.5;
+
+        fn min(a, b) {
+            if a < b return a;
+            else return b;
+        }
+
+        fn max(a, b) {
+            if a > b return a;
+            else return b;
+        }
+
+        fn sin(x) -> ___sin___(x);
+
+        fn cos(x) -> ___cos___(x);
+
+        fn tan(x) -> ___tan___(x);
+
+        fn pow(base, exp) -> base ** exp;
+
+        fn ceil(x) {
+            let int_part = int(x);
+            if x > int_part return int_part + 1;
+            else return int_part;
+        }
+
+        fn floor(x) {
+            let int_part = Math.int(x);
+            if x < int_part return int_part - 1;
+            else return int_part;
+        }
+
+        fn clamp(n, min, max) {
+            if n < min {
+                return min;
+            }
+
+            if n > max {
+                return max;
+            }
+
+            return n;
+        }
+
+        fn factorial(n) {
+            let res = 1;
+            let i = 2;
+
+            for (i = 2; i < n; i = i + 1) {
+                res = res * i;
+            }
+
+            return res;
+        }
+
+        fn gcd(n, other) {
+            let a = std.Math.abs(n);
+            let b = std.Math.abs(other);
+
+            while b != 0 {
+                let temp = b;
+                b = a % b;
+                a = temp;
+            }
+
+            return a;
+        }
+
+        fn lcm(n, other) {
+            return std.Math.abs(n * other) / std.Math.gcd(n, other);
+        }
+
+        fn exp(num) {
+            let result = 1;
+            let term = 1;
+            let n = 1;
+
+            for (n = 1; n < 20; n = n + 1) {
+                term = term * num / n;
+                result = result + term;
+            }
+
+            return result;
+        }
+
+        fn int(x) {
+            if x % 1 == 0 return x;
+
+            if x >= 0 return x - (x % 1);
+            else return x - (x % 1) + 1;
+        }
+
+        fn random() -> ___random___();
+
+        fn random_with_range(x, y) {
+            if x >= y return null;
+            return x + Math.random() * (y - x);
+        }
+
+        let PI = 3.141592653589793;
+        let Euler = 2.718281828459045;
+        let Phi = 1.6180339887498948;
+        let EulerMascheroni = 0.5772156649015328;
+        let Sqrt2 = 1.4142135623730951;
+        let Sqrt3 = 1.7320508075688772;
+        let Sqrt5 = 2.23606797749979;
+        let NLog2 = 0.6931471805599453;
+        let NLog10 = 2.3025850929940456;
+
+        export abs, sqrt, min, max, sin, cos, tan, pow, ceil, floor, clamp, factorial, gcd, lcm, exp, int, random, random_with_range, PI, Euler, Phi, EulerMascheroni, Sqrt2, Sqrt3, Sqrt5, NLog2, NLog10;
+    }
+
+    class String with Printable {
+        fn init(value) {
+            self.value = value;
+        }
+
+        fn empty() {
+            return new String("");
+        }
+
+        fn length() {
+            return self.value.length();
+        }
+
+        fn is_empty() {
+            return self.value.is_empty();
+        }
+
+        fn char_at(pos) {
+            return self.value.char_at(pos);
+        }
+
+        fn substring(start, end) {
+            return self.value.substring(start, end);
+        }
+
+        fn index_of(char) {
+            return self.value.index_of(char);
+        }
+
+        fn contains(str) {
+            return self.value.contains(str);
+        }
+
+        fn to_upper() {
+            return self.value.to_upper();
+        }
+
+        fn to_lower() {
+            return self.value.to_lower();
+        }
+
+        fn trim() {
+            return self.value.trim();
+        }
+
+        fn split(delimiter) {
+            return self.value.split(delimiter);
+        }
+
+        fn append(str) {
+            return self.value.append(str);
+        }
+
+        fn equals(other) {
+            return self.value.equals(other);
+        }
+
+        fn starts_with(value) {
+            return self.value.starts_with(value);
+        }
+
+        fn ends_with(value) {
+            return self.value.ends_with(value);
+        }
+
+        fn to_string() {
+            return self.value;
+        }
+    }
+
+    namespace System {
+        fn timer(time) {
+            let end_time = clock();
+            let elapsed = end_time - time;
+            println("Time elapsed: " + elapsed + "ms.");
+        }
+
+        fn sleep(time) -> ___sleep___(time);
+
+        export timer, sleep;
+    }
+
+    export Collections, Math, String, System;
+}
+
+class Range with Iterable, Printable {
+    fn init(start, end) {
+        self.start = start;
+        self.end = end;
+        self.current = start;
+    }
+
+    fn next() {
+        if (self.has_next()) {
+            let result = self.current;
+            self.current = self.current + 1;
+
+            return result;
+        } else {
+            return null;
+        }
+    }
+
+    fn has_next() {
+        return self.current <= self.end;
+    }
+
+    fn size() {
+        return self.end - self.start;
+    }
+
+    fn is_empty() {
+        return self.start >= self.end;
+    }
+
+    fn each(callback) {
+        let value = self.current;
+        while value < self.end {
+            callback(value);
+            value += 1;
+        }
+    }
+
+    fn to_string() {
+        return "[" + self.start + ":" + self.end + "]";
+    }
+}
+
+enum Option union {
+    Some(value)
+    | None
+}
+
+impl Option {
+    fn is_some() -> match self {
+        Some(value) -> true;
+        None() -> false;
+    };
+
+    fn is_none() -> match self {
+        Some(value) -> false;
+        None() -> true;
+    };
+
+    fn unwrap() -> match self {
+        Some(value) -> value;
+        None -> {
+            throw new Error("Called Option#unwrap() on an 'Err' value");
+        }
+    };
+
+    fn unwrap_or(default) -> match self {
+        Some(value) -> value;
+        * -> default;
+    };
+
+    fn map(transform) -> match self {
+        Some(value) -> Option.Some(transform(value));
+        * -> self;
+    };
+
+    fn filter(predicate) -> match self {
+        Some(value) if predicate(value) -> self;
+        * -> Option.None();
+    };
+
+    fn and(option) -> match self {
+        Some(_) -> option;
+        * -> Option.None();
+    };
+
+    fn or(option) -> match self {
+        Some(_) -> self;
+        * -> option;
+    };
+}
+
+enum Result union {
+    Ok(value)
+    | Err(message)
+}
+
+impl Result {
+    fn is_ok() -> match self {
+        Ok(_) -> true;
+        Err(_) -> false;
+    };
+
+    fn is_err() -> match self {
+        Ok(_) -> false;
+        Err(_) -> true;
+    };
+
+    fn unwrap() -> match self {
+        Ok(value) -> value;
+        Err(message) -> {
+            throw new Error("Called Result#unwrap() on an 'Err' value: $message");
+        }
+    };
+
+    fn unwrap_or(default) -> match self {
+        Ok(value) -> value;
+        * -> default;
+    };
+
+    fn map(transform) -> match self {
+        Ok(value) -> Result.Ok(transform(value));
+        * -> self;
+    };
+
+    fn map_err(transform) -> match self {
+        Err(message) -> Result.Err(transform(message));
+        * -> self;
+    };
+
+    fn and_then(callback) -> match self {
+        Ok(value) -> callback(value);
+        * -> self;
+    };
+
+    fn or_else(callback) -> match self {
+        Err(message) -> callback(message);
+        * -> self;
+    };
+}
+
+class Request {
+    fn init(method, path, headers, body, query, json, params) {
+        self.method = method;
+        self.path = path;
+        self.headers = headers;
+        self.body = body;
+        self.query = query;
+        self.json = json;
+        self.params = params;
+    }
+}
+
+class Response {
+    fn init(client_socket) {
+        self.socket = client_socket;
+        self.status_code = 200;
+        self.headers = [
+            "Content-Type: text/plain",
+            "Connection: close"
+        ];
+        self.is_sent = false;
+    }
+
+    fn async status(code) {
+        self.status_code = code;
+        return self;
+    }
+
+    fn async set_header(header_string) {
+        self.headers.insert(header_string);
+        return self;
+    }
+
+    private fn async get_status_text() -> match self.status_code {
+        200 -> "OK";
+        201 -> "Created";
+        400 -> "Bad Request";
+        404 -> "Not Found";
+        500 -> "Internal Server Error";
+
+        * -> "Unknown";
+    };
+
+    fn async build_payload(body) {
+        let status_text = await self.get_status_text();
+        let response_text = "HTTP/1.1 ${self.status_code} ${status_text}\r\n";
+
+        for header in self.headers {
+            response_text = response_text + header + "\r\n";
+        }
+
+        response_text = response_text + "\r\n" + body;
+        return response_text;
+    }
+
+    fn async send(body) {
+        self.is_sent = true;
+        await self.set_header("Content-Length: ${body.len()}");
+        let payload = await self.build_payload(body);
+
+        println("Writing ${body.len()} bytes to socket...");
+        await ___tcp_write___(self.socket, payload);
+        await ___tcp_close___(self.socket);
+
+        println("Socket closed successfully.");
+    }
+
+    fn async json(data) {
+        self.is_sent = true;
+        await self.set_header("Content-Type: application/json");
+        let json_string = stringify_json(data);
+        await self.send(json_string);
+    }
+
+    fn async send_file(file_path) {
+        self.is_sent = true;
+        let content = read_file(file_path);
+
+        if content == null {
+            await self.set_header("Content-Type: text/plain; charset=utf-8");
+            await self.send("404: File not found on disk");
+            return null;
+        }
+
+        let mime_type = "text/plain; charset=utf-8";
+
+        if file_path.ends_with(".html") {
+            mime_type = "text/html; charset=utf-8";
+        } else if file_path.ends_with(".css") {
+            mime_type = "text/css; charset=utf-8";
+        } else if file_path.ends_with(".js") {
+            mime_type = "application/javascript; charset=utf-8";
+        } else if file_path.ends_with(".json") {
+            mime_type = "application/json; charset=utf-8";
+        }
+
+        await self.set_header("Content-Type: ${mime_type}");
+        await self.send(content);
+    }
+}
+
+class Server {
+    fn init() {
+        self.routes = [];
+        self.middlewares = [];
+    }
+
+    fn async get(path, handler) {
+        self.routes.insert(["GET", path, handler]);
+    }
+
+    fn async post(path, handler) {
+        self.routes.insert(["POST", path, handler]);
+    }
+
+    fn async use(middleware_function) {
+        self.middlewares.insert(middleware_function);
+    }
+
+    private fn async parse_request(raw_http_string) {
+        if raw_http_string == null return new Request("GET", "/", [], "", null, {});
+
+        let http_parts = raw_http_string.split("\r\n\r\n");
+        let head_section = http_parts[0];
+
+        let body = "";
+        let json_data = null;
+
+        if http_parts.len() > 1 {
+            body = http_parts[1];
+
+            if body.len() > 0 && body.starts_with("{") {
+                json_data = parse_json(body);
+            }
+        }
+
+        let lines = head_section.split("\r\n");
+        if lines.len() == 0 return new Request("GET", "/", [], body, null, {});
+
+        let request_line = lines[0].split(" ");
+        if request_line.len() < 2 return new Request("GET", "/", [], body, null, {});
+
+        let method = request_line[0];
+        let full_path = request_line[1];
+        let path = full_path;
+        let query_dict = {};
+
+        if full_path.contains("?") {
+            let path_parts = full_path.split("[?]");
+            path = path_parts[0];
+
+            if path_parts.len() > 1 {
+                let query_string = path_parts[1];
+                let pairs = query_string.split("&");
+
+                for pair in pairs {
+                    let kv = pair.split("=");
+
+                    if kv.len() == 2 {
+                        let key = kv[0];
+                        let value = kv[1];
+
+                        query_dict[key] = value;
+                    }
+                }
+            }
+        }
+
+        return new Request(method, path, [], body, query_dict, json_data, {});
+    }
+
+    private fn async handle_connection(client) {
+        let raw_data = await ___tcp_read___(client, 4096);
+
+        if raw_data == null {
+            await ___tcp_close___(client);
+            return null;
+        }
+
+        let req = await self.parse_request(raw_data);
+        let res = new Response(client);
+
+        for middleware in self.middlewares {
+            await middleware(req, res);
+
+            if res.is_sent {
+                return null;
+            }
+        }
+
+        let handled = false;
+
+        for route in self.routes {
+            let route_method = route[0];
+            let route_path = route[1];
+            let handler = route[2];
+
+            if req.method == route_method && !handled {
+                let req_parts = req.path.split("/");
+                let route_parts = route_path.split("/");
+
+                if req_parts.len() == route_parts.len() {
+                    let is_match = true;
+                    let extracted_params = {};
+
+                    let i = 0;
+                    while i < req_parts.len() && is_match {
+                        let r_part = route_parts[i];
+                        let p_part = req_parts[i];
+
+                        if r_part.starts_with(":") {
+                            let param_name = r_part.substring(1, r_part.len());
+                            extracted_params[param_name] = p_part;
+                        } else if r_part != p_part {
+                            is_match = false;
+                        }
+
+                        i = i + 1;
+                    }
+
+                    if is_match {
+                        req.params = extracted_params;
+                        await handler(req, res);
+                        handled = true;
+                    }
+                }
+            }
+        }
+
+        if !handled {
+            await res.status(404);
+            await res.send("404 - Page Not Found");
+        }
+    }
+
+    fn async listen(port, callback) {
+        let server = await ___tcp_bind___(port);
+        await callback(port);
+
+        while true {
+            let client = await ___tcp_accept___(server);
+
+            if client != null {
+                await self.handle_connection(client);
+            }
+        }
+    }
+}
