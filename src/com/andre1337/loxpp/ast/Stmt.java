@@ -24,10 +24,6 @@ public abstract class Stmt {
 
     R visitForInStmt(ForIn stmt);
 
-    R visitMatchStmt(Match stmt);
-
-    R visitMatchCaseStmt(MatchCase stmt);
-
     R visitTraitStmt(Trait stmt);
 
     R visitThrowStmt(Throw stmt);
@@ -45,6 +41,10 @@ public abstract class Stmt {
     R visitUsingStmt(Using stmt);
 
     R visitForStmt(For stmt);
+
+    R visitImplStmt(Impl stmt);
+
+    R visitExportStmt(Export Stmt);
   }
 
   public static class Block extends Stmt {
@@ -104,11 +104,23 @@ public abstract class Stmt {
   }
 
   public static class Function extends Stmt {
-    public Function(Token name, List<Token> params, List<Stmt> body, boolean isAbstract) {
+    public static class Param {
+      public final Token name;
+      public final Expr defaultValue;
+
+      public Param(Token name, Expr defaultValue) {
+        this.name = name;
+        this.defaultValue = defaultValue;
+      }
+    }
+
+    public Function(Token name, List<Param> params, List<Stmt> body, boolean isAbstract, boolean isAsync, boolean isPrivate) {
       this.name = name;
       this.params = params;
       this.body = body;
       this.isAbstract = isAbstract;
+      this.isAsync = isAsync;
+      this.isPrivate = isPrivate;
     }
 
     @Override
@@ -117,9 +129,11 @@ public abstract class Stmt {
     }
 
     public final Token name;
-    public final List<Token> params;
+    public final List<Param> params;
     public final List<Stmt> body;
     public final boolean isAbstract;
+    public final boolean isAsync;
+    public final boolean isPrivate;
   }
 
   public static class If extends Stmt {
@@ -205,36 +219,6 @@ public abstract class Stmt {
     public final List<Stmt> body;
   }
 
-  public static class Match extends Stmt {
-    public Match(Expr expression, List<MatchCase> cases) {
-      this.expression = expression;
-      this.cases = cases;
-    }
-
-    @Override
-    public <R> R accept(Visitor<R> visitor) {
-      return visitor.visitMatchStmt(this);
-    }
-
-    public final Expr expression;
-    public final List<MatchCase> cases;
-  }
-
-  public static class MatchCase extends Stmt {
-    public MatchCase(Expr pattern, Stmt statement) {
-      this.pattern = pattern;
-      this.statement = statement;
-    }
-
-    @Override
-    public <R> R accept(Visitor<R> visitor) {
-      return visitor.visitMatchCaseStmt(this);
-    }
-
-    public final Expr pattern;
-    public final Stmt statement;
-  }
-
   public static class Trait extends Stmt {
     public Trait(Token name, List<Expr> traits, List<Stmt.Function> methods) {
       this.name = name;
@@ -268,11 +252,10 @@ public abstract class Stmt {
   }
 
   public static class Enum extends Stmt {
-    public record Variant(Token name, List<Token> parameters) { }
-
-    public Enum(Token name, List<Variant> variants) {
+    public Enum(Token name, List<EnumCase> cases, boolean isUnion) {
       this.name = name;
-      this.variants = variants;
+      this.cases = cases;
+      this.isUnion = isUnion;
     }
 
     @Override
@@ -281,7 +264,18 @@ public abstract class Stmt {
     }
 
     public final Token name;
-    public final List<Variant> variants;
+    public final List<EnumCase> cases;
+    public final boolean isUnion;
+  }
+
+  public record EnumCase(Token name, List<Token> parameters) {
+    public Token name() {
+      return name;
+    }
+
+    public List<Token> parameters() {
+      return parameters;
+    }
   }
 
   public static class TryCatch extends Stmt {
@@ -378,6 +372,32 @@ public abstract class Stmt {
     public final Expr condition;
     public final Expr increment;
     public final List<Stmt> body;
+  }
+
+  public static class Impl extends Stmt {
+    public Impl(Token keyword, Expr name, List<Stmt.Function> methods) {
+      this.keyword = keyword;
+      this.name = name;
+      this.methods = methods;
+    }
+
+    @Override
+    public <R> R accept(Visitor<R> visitor) { return visitor.visitImplStmt(this); }
+
+    public final Token keyword;
+    public final Expr name;
+    public final List<Stmt.Function> methods;
+  }
+
+  public static class Export extends Stmt {
+    public Export(List<Token> names) {
+      this.names = names;
+    }
+
+    @Override
+    public <R> R accept(Visitor<R> visitor) { return visitor.visitExportStmt(this); }
+
+    public final List<Token> names;
   }
 
   @SuppressWarnings("UnusedReturnValue")

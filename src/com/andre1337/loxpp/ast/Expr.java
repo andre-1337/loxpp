@@ -1,5 +1,7 @@
 package com.andre1337.loxpp.ast;
 
+import com.andre1337.loxpp.classes.LoxClass;
+import com.andre1337.loxpp.classes.LoxFunction;
 import com.andre1337.loxpp.lexer.Token;
 
 import java.util.*;
@@ -49,6 +51,20 @@ public abstract class Expr {
     R visitSpreadExpr(Spread expr);
 
     R visitTernaryExpr(Ternary expr);
+
+    R visitMatchExpr(Match expr);
+
+    R visitWildcardPatternExpr(WildcardPattern expr);
+
+    R visitUnionPatternExpr(UnionPattern expr);
+
+    R visitListPatternExpr(ListPattern expr);
+
+    R visitObjectPatternExpr(ObjectPattern expr);
+
+    R visitAwaitExpr(Await expr);
+
+    R visitNewExpr(New expr);
   }
 
   public static class Assign extends Expr {
@@ -115,6 +131,9 @@ public abstract class Expr {
 
     public final Expr object;
     public final Token name;
+
+    public LoxClass cachedClass = null;
+    public LoxFunction cachedMethod = null;
   }
 
   public static class Grouping extends Expr {
@@ -285,9 +304,10 @@ public abstract class Expr {
   }
 
   public static class Lambda extends Expr {
-    public Lambda(List<Token> params, List<Stmt> body) {
+    public Lambda(List<Stmt.Function.Param> params, List<Stmt> body, boolean isAsync) {
       this.params = params;
       this.body = body;
+      this.isAsync = isAsync;
     }
 
     @Override
@@ -295,8 +315,9 @@ public abstract class Expr {
       return visitor.visitLambdaExpr(this);
     }
 
-    public final List<Token> params;
+    public final List<Stmt.Function.Param> params;
     public final List<Stmt> body;
+    public final boolean isAsync;
   }
 
   public static class Dictionary extends Expr {
@@ -379,6 +400,111 @@ public abstract class Expr {
     public final Expr condition;
     public final Expr thenBranch;
     public final Expr elseBranch;
+  }
+
+  public static class Match extends Expr {
+    public Match(Token keyword, Expr value, List<MatchCase> cases) {
+      this.keyword = keyword;
+      this.value = value;
+      this.cases = cases;
+    }
+
+    @Override
+    public <R> R accept(Visitor<R> visitor) { return visitor.visitMatchExpr(this); }
+
+    public final Token keyword;
+    public final Expr value;
+    public final List<MatchCase> cases;
+  }
+
+  public static class MatchCase {
+    public MatchCase(Expr pattern, Expr guard, List<Stmt> body) {
+      this.pattern = pattern;
+      this.guard = guard;
+      this.body = body;
+    }
+
+    public final Expr pattern;
+    public final Expr guard;
+    public final List<Stmt> body;
+  }
+
+  public static class WildcardPattern extends Expr {
+    public WildcardPattern(Token token) {
+      this.token = token;
+    }
+
+    @Override
+    public <R> R accept(Visitor<R> visitor) { return visitor.visitWildcardPatternExpr(this); }
+
+    public final Token token;
+  }
+
+  public static class UnionPattern extends Expr {
+    public UnionPattern(Token caseName, List<Token> bindings) {
+      this.caseName = caseName;
+      this.bindings = bindings;
+    }
+
+    @Override
+    public <R> R accept(Visitor<R> visitor) { return visitor.visitUnionPatternExpr(this); }
+
+    public final Token caseName;
+    public final List<Token> bindings;
+  }
+
+  public static class ListPattern extends Expr {
+    public ListPattern(List<Expr> elements, Expr rest) {
+      this.elements = elements;
+      this.rest = rest;
+    }
+
+    @Override
+    public <R> R accept(Visitor<R> visitor) { return visitor.visitListPatternExpr(this); }
+
+    public final List<Expr> elements;
+    public final Expr rest;
+  }
+
+  public static class ObjectPattern extends Expr {
+    public record Property(Token name, Expr pattern) {}
+
+    public ObjectPattern(List<Property> properties, Expr rest) {
+      this.properties = properties;
+      this.rest = rest;
+    }
+
+    @Override
+    public <R> R accept(Visitor<R> visitor) { return visitor.visitObjectPatternExpr(this); }
+
+    public final List<Property> properties;
+    public final Expr rest;
+  }
+
+  public static class Await extends Expr {
+    public Await(Token keyword, Expr value) {
+      this.keyword = keyword;
+      this.value = value;
+    }
+
+    @Override
+    public <R> R accept(Visitor<R> visitor) { return visitor.visitAwaitExpr(this); }
+
+    public final Token keyword;
+    public final Expr value;
+  }
+
+  public static class New extends Expr {
+    public New(Token keyword, Expr.Call constructor) {
+      this.keyword = keyword;
+      this.constructor = constructor;
+    }
+
+    @Override
+    public <R> R accept(Visitor<R> visitor) { return visitor.visitNewExpr(this); }
+
+    public final Token keyword;
+    public final Expr.Call constructor;
   }
 
   public abstract <R> R accept(Visitor<R> visitor);

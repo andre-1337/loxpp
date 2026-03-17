@@ -2,7 +2,9 @@ package com.andre1337.loxpp.classes;
 
 import com.andre1337.loxpp.lexer.Token;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
 
 public class LoxInstance {
   public LoxClass klass;
@@ -19,6 +21,15 @@ public class LoxInstance {
 
     LoxFunction method = klass.findMethod(name.lexeme);
     if (method != null) return method.bind(this);
+
+    if (klass.meta != null) {
+      LoxFunction staticMethod = klass.meta.findMethod(name.lexeme);
+
+      if (staticMethod != null) {
+        throw new RuntimeError(name, "RuntimeError", "Static method '" + name.lexeme + "' can only be called on the class '" + klass.name + "', not on an instance.", null);
+      }
+    }
+
     throw new RuntimeError(name, "RuntimeError", "Undefined property '" + name.lexeme + "'.", null);
   }
 
@@ -31,7 +42,7 @@ public class LoxInstance {
     if (klass.methods.containsKey("to_string") && !klass.traits.containsKey("Printable")) {
       throw new RuntimeError(klass.token, "RuntimeError", "Class must implement trait 'Printable' to declare a 'to_string' method.", null);
     } else if (klass.traits.containsKey("Printable") && klass.methods.containsKey("to_string")) {
-      Object method = klass.methods.get("to_string").bind(this).call(klass.interpreter, new ArrayList<>());
+      Object method = klass.methods.get("to_string").bind(this).call(klass.interpreter, new ArrayList<>(), false);
       if (method instanceof LoxString str) {
         return str.value;
       } else {

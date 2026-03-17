@@ -1,6 +1,7 @@
 package com.andre1337.loxpp;
 
 import com.andre1337.loxpp.ast.Stmt;
+import com.andre1337.loxpp.classes.LoxModule;
 import com.andre1337.loxpp.classes.RuntimeError;
 import com.andre1337.loxpp.interpreter.Interpreter;
 import com.andre1337.loxpp.lexer.Scanner;
@@ -8,7 +9,6 @@ import com.andre1337.loxpp.lexer.Token;
 import com.andre1337.loxpp.lexer.TokenType;
 import com.andre1337.loxpp.parser.Parser;
 import com.andre1337.loxpp.sema.Resolver;
-import com.andre1337.loxpp.transpiler.Transpiler;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -19,15 +19,14 @@ import java.nio.file.Paths;
 import java.util.*;
 
 public class Lox {
-  private static final Interpreter interpreter = new Interpreter(false);
-  private static final Transpiler transpiler = new Transpiler();
+  private static final Interpreter interpreter = new Interpreter();
   static boolean hadError = false;
   static boolean hadRuntimeError = false;
   private static List<String> sourceFile;
+  public static final Map<String, LoxModule> loadedModules = new HashMap<>();
 
   private static void checkFileExtension(String path) {
     if (path.endsWith(".lox") || path.endsWith(".loxlib") || path.endsWith(".loxtest")) {
-      return;
     } else {
       throw new RuntimeError(new Token(TokenType.EOF, "", null, 0, 0), "RuntimeError", "The provided file extension is not supported by Lox++.", "Please consider changing it to '.lox' if you're writing a program or '.loxlib' if you're writing a library.");
     }
@@ -101,13 +100,17 @@ public class Lox {
     List<Stmt> statements = getStmts(source);
     if (hadError) return;
 
+    //Optimizer optimizer = new Optimizer();
+    //List<Stmt> optimized = optimizer.optimize(statements);
+
+    //if (hadError) return;
+
     Resolver resolver = new Resolver(interpreter);
     resolver.resolve(statements);
 
     if (hadError) return;
 
     interpreter.interpret(statements);
-    //transpiler.transpile(statements);
   }
 
   private static List<Stmt> getStmts(String source) {
@@ -126,7 +129,7 @@ public class Lox {
     msg.append("┌ [").append(line).append(":").append(column).append("] Error").append(where).append(": ").append(message).append("\n");
 
     if (line > 0 && line <= sourceFile.size()) {
-      String sourceLine = sourceFile.get(line);
+      String sourceLine = sourceFile.get(line - 1);
       msg.append("├ ").append(sourceLine).append("\n");
 
       if (column > 0 && column <= sourceLine.length()) {

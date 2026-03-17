@@ -6,10 +6,7 @@ import com.andre1337.loxpp.ast.Stmt;
 import com.andre1337.loxpp.lexer.Token;
 import com.andre1337.loxpp.lexer.TokenType;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import static com.andre1337.loxpp.lexer.TokenType.*;
 
@@ -67,7 +64,7 @@ public class Parser {
       if (match(CLASS))
         return classDeclaration();
       if (match(FN))
-        return function("function");
+        return function();
       if (match(LET))
         return destructuringDeclaration();
       if (match(TRAIT))
@@ -78,6 +75,10 @@ public class Parser {
         return namespaceDeclaration();
       if (match(USING))
         return usingDeclaration();
+      if (match(IMPL))
+        return implDeclaration();
+      if (match(EXPORT))
+        return exportDeclaration();
 
       return statement();
     } catch (ParseError error) {
@@ -107,7 +108,23 @@ public class Parser {
     if (isDataclass) {
       List<Stmt> body = new ArrayList<>();
       for (Expr.Variable field : fields) {
-        body.add(new Stmt.Expression(new Expr.Set(new Expr.This(new Token(THIS, "self", null, 0, 0)), field.name, field)));
+        body.add(
+                new Stmt.Expression(
+                        new Expr.Set(
+                                new Expr.This(
+                                        new Token(
+                                                THIS,
+                                                "self",
+                                                null,
+                                                0,
+                                                0
+                                        )
+                                ),
+                                field.name,
+                                field
+                        )
+                )
+        );
       }
 
       methods.add(
@@ -119,8 +136,13 @@ public class Parser {
                               0,
                               0
                       ),
-                      fields.stream().map(field -> new Token(IDENTIFIER, field.name.lexeme, null, 0, 0)).toList(),
+                      fields.stream().map(field -> new Stmt.Function.Param(
+                              new Token(IDENTIFIER, field.name.lexeme, null, 0, 0),
+                              null)
+                      ).toList(),
                       body,
+                      false,
+                      false,
                       false
               )
       );
@@ -140,9 +162,11 @@ public class Parser {
       consume(LEFT_BRACE, "Expect '{' before class body.");
 
       while (!check(RIGHT_BRACE) && !isAtEnd()) {
+        boolean isPrivate = match(PRIVATE);
         boolean isStatic = match(STATIC);
         consume(FN, "Expect 'fn' keyword before method declaration.");
-        (isStatic ? staticMethods : methods).add(function("method"));
+        boolean isAsync = match(ASYNC);
+        (isStatic ? staticMethods : methods).add(function("method", isAsync, isPrivate));
       }
 
       consume(RIGHT_BRACE, "Expect '}' after class body.");
@@ -161,8 +185,6 @@ public class Parser {
       return whileStatement();
     if (match(LEFT_BRACE))
       return new Stmt.Block(block());
-    if (match(MATCH))
-      return matchStatement();
     if (match(THROW))
       return throwStatement();
     if (match(TRY))
@@ -292,17 +314,6 @@ public class Parser {
     return new Stmt.Var(name, initializer);
   }
 
-  private List<Token> destructuringPattern() {
-    List<Token> keys = new ArrayList<>();
-
-    do {
-      keys.add(consume(IDENTIFIER, "Expect key name in destructuring expression."));
-    } while (match(COMMA));
-    consume(RIGHT_BRACE, "Expect '}' at the end of destructuring pattern.");
-
-    return keys;
-  }
-
   private List<Expr> withClause() {
     List<Expr> traits = new ArrayList<>();
     if (match(WITH)) {
@@ -342,37 +353,34 @@ public class Parser {
     return new Stmt.Trait(name, traits, methods);
   }
 
-  private Stmt.Enum.Variant enumVariant() {
-    Token name = consume(IDENTIFIER, "Expect variant name.");
-    List<Token> parameters = new ArrayList<>();
-
-    if (match(LEFT_PAREN)) {
-      do {
-        parameters.add(consume(IDENTIFIER, "Expect parameter name."));
-      } while (match(COMMA));
-
-      consume(RIGHT_PAREN, "Expect ')' after parameters.");
-    }
-
-    return new Stmt.Enum.Variant(name, parameters);
-  }
-
   private Stmt enumDeclaration() {
     Token name = consume(IDENTIFIER, "Expect enum name.");
+    boolean isUnion = match(UNION);
+
     consume(LEFT_BRACE, "Expect '{' before enum body.");
 
-    List<Stmt.Enum.Variant> variants = new ArrayList<>();
+    List<Stmt.EnumCase> cases = new ArrayList<>();
 
-    while (!check(RIGHT_BRACE) && !isAtEnd()) {
-      variants.add(enumVariant());
+    do {
+      Token caseName = consume(IDENTIFIER, "Expect case name.");
+      List<Token> parameters = new ArrayList<>();
 
-      if (!check(RIGHT_BRACE)) {
-        consume(COMMA, "Expect ',' between enum variants.");
+      if (match(LEFT_PAREN) && isUnion) {
+        if (!check(RIGHT_PAREN)) {
+          do {
+            parameters.add(consume(IDENTIFIER, "Expect parameter name."));
+          } while (match(COMMA));
+        }
+
+        consume(RIGHT_PAREN, "Expect ')' after parameters.");
       }
-    }
 
-    consume(RIGHT_BRACE, "Expect '}' after enum body.");
-    return new Stmt.Enum(name, variants);
+      cases.add(new Stmt.EnumCase(caseName, parameters));
+    } while (match(COMMA, BITWISE_OR) && !check(RIGHT_BRACE));
+
+    consume(RIGHT_BRACE, "Expect '}' after enum cases.");
+
+    return new Stmt.Enum(name, cases, isUnion);
   }
 
   private Stmt namespaceDeclaration() {
@@ -411,6 +419,34 @@ public class Parser {
     return new Stmt.Using(keyword, names, source);
   }
 
+  private Stmt implDeclaration() {
+    Token keyword = previous();
+    consume(IDENTIFIER, "Expect type name.");
+    Expr.Variable name = new Expr.Variable(previous());
+    consume(LEFT_BRACE, "Expect '{' before impl body.");
+
+    List<Stmt.Function> methods = new ArrayList<>();
+    while (!check(RIGHT_BRACE) && !isAtEnd()) {
+      consume(FN, "Expect 'fn' before method name.");
+      boolean isAsync = match(ASYNC);
+      methods.add(function("method", isAsync, false));
+    }
+
+    consume(RIGHT_BRACE, "Expect '}' after impl body.");
+    return new Stmt.Impl(keyword, name, methods);
+  }
+
+  private Stmt exportDeclaration() {
+    List<Token> names = new ArrayList<>();
+
+    do {
+      names.add(consume(IDENTIFIER, "Expect identifier to export."));
+    } while (match(COMMA));
+
+    consume(SEMICOLON, "Expect ';' after export name.");
+    return new Stmt.Export(names);
+  }
+
   private Stmt whileStatement() {
     Expr condition = expression();
 
@@ -424,24 +460,48 @@ public class Parser {
     return new Stmt.Expression(expr);
   }
 
-  private Stmt.Function function(String kind) {
-    Token name = consume(IDENTIFIER, "Expect " + kind + " name.");
-    List<Token> parameters = new ArrayList<>();
-    List<Stmt> body = new ArrayList<>();
+  private Stmt function() {
+    boolean isAsync = match(ASYNC);
+    return function(isAsync ? "async function" : "function", isAsync, false);
+  }
 
-    consume(LEFT_PAREN, "Expect '(' after " + kind + " name.");
+  private List<Stmt.Function.Param> parameters() {
+    List<Stmt.Function.Param> params = new ArrayList<>();
+    boolean hasSeenDefault = false;
 
     if (!check(RIGHT_PAREN)) {
       do {
-        if (parameters.size() >= 255) {
+        Token name = consume(IDENTIFIER, "Expect parameter name.");
+        Expr defaultValue = null;
+
+        if (match(EQUAL)) {
+          hasSeenDefault = true;
+          defaultValue = expression();
+        } else {
+          if (hasSeenDefault) {
+            throw error(previous(), "Required parameter '" + name.lexeme + "' cannot come after a parameter with a default value.");
+          }
+        }
+
+        if (params.size() >= 255) {
           throw error(peek(), "Can't have more than 255 parameters.");
         }
 
-        parameters.add(consume(IDENTIFIER, "Expect parameter name."));
+        params.add(new Stmt.Function.Param(name, defaultValue));
       } while (match(COMMA));
     }
 
     consume(RIGHT_PAREN, "Expect ')' after parameters.");
+
+    return params;
+  }
+
+  private Stmt.Function function(String kind, boolean isAsync, boolean isPrivate) {
+    Token name = consume(IDENTIFIER, "Expect " + kind + " name.");
+    consume(LEFT_PAREN, "Expect '(' after " + kind + " name.");
+
+    List<Stmt.Function.Param> parameters = parameters();
+    List<Stmt> body = new ArrayList<>();
 
     if (match(ARROW)) {
       body.add(new Stmt.Return(new Token(RETURN, "return", "return", previous().line++, previous().column++), expression()));
@@ -451,39 +511,29 @@ public class Parser {
       body = block();
     }
 
-    return new Stmt.Function(name, parameters, body, false);
+    return new Stmt.Function(name, parameters, body, false, isAsync, isPrivate);
   }
 
   private Stmt.Function traitMethod(boolean isAbstract) {
+    boolean isAsync;
+
     if (isAbstract) {
       consume(FN, "Expect 'fn' keyword before method name");
+      isAsync = match(ASYNC);
+
       Token name = consume(IDENTIFIER, "Expect trait method name.");
       consume(LEFT_PAREN, "Expect '(' after trait method name.");
 
-      List<Token> parameters = new ArrayList<>();
-      parseParameters(parameters);
+      List<Stmt.Function.Param> parameters = parameters();
       consume(SEMICOLON, "Expect ';' after abstract trait method.");
 
-      return new Stmt.Function(name, parameters, null, isAbstract);
+      return new Stmt.Function(name, parameters, null, true, isAsync, false);
     } else if (match(FN)) {
-      return function("trait method");
+      isAsync = match(ASYNC);
+      return function("trait method", isAsync, false);
     }
 
     return null;
-  }
-
-  private void parseParameters(List<Token> parameters) {
-    if (!check(RIGHT_PAREN)) {
-      do {
-        if (parameters.size() >= 255) {
-          throw error(peek(), "Can't have more than 255 parameters.");
-        }
-
-        parameters.add(consume(IDENTIFIER, "Expect parameter name."));
-      } while (match(COMMA));
-    }
-
-    consume(RIGHT_PAREN, "Expect ')' after parameters.");
   }
 
   private List<Stmt> block() {
@@ -495,29 +545,6 @@ public class Parser {
 
     consume(RIGHT_BRACE, "Expect '}' after block.");
     return statements;
-  }
-
-  private Stmt.MatchCase parseMatchCase() {
-    Expr expr = expression();
-    consume(ARROW, "Expect '->' after match pattern.");
-    Stmt statement = statement();
-    return new Stmt.MatchCase(expr, statement);
-  }
-
-  private List<Stmt.MatchCase> parseMatchCases() {
-    List<Stmt.MatchCase> cases = new ArrayList<>();
-    while (match(CASE)) {
-      cases.add(parseMatchCase());
-    }
-    return cases;
-  }
-
-  private Stmt matchStatement() {
-    Expr expression = expression();
-    consume(LEFT_BRACE, "Expect '{' before match cases.");
-    List<Stmt.MatchCase> cases = parseMatchCases();
-    consume(RIGHT_BRACE, "Expect '}' after match cases.");
-    return new Stmt.Match(expression, cases);
   }
 
   private Stmt throwStatement() {
@@ -549,7 +576,7 @@ public class Parser {
         Expr expr = expression();
         keyValues.put(spread, new Expr.Spread(spread, expr));
       } else {
-        Token key = consume(IDENTIFIER, "Expect dictionary key.");
+        Token key = consume(STRING, "Expect dictionary key.");
         consume(COLON, "Expect ':' after dictionary key.");
 
         Expr value = expression();
@@ -590,21 +617,10 @@ public class Parser {
   }
 
   private Expr lambda() {
+    boolean isAsync = match(ASYNC);
     consume(LEFT_PAREN, "Expect '(' after 'fn'.");
-    List<Token> parameters = new ArrayList<>();
+    List<Stmt.Function.Param> parameters = parameters();
     List<Stmt> body = new ArrayList<>();
-
-    if (!check(RIGHT_PAREN)) {
-      do {
-        if (parameters.size() >= 255) {
-          throw error(peek(), "Can't have more than 255 parameters.");
-        }
-
-        parameters.add(consume(IDENTIFIER, "Expect parameter name."));
-      } while (match(COMMA));
-    }
-
-    consume(RIGHT_PAREN, "Expect ')' after list of parameters.");
 
     if (match(ARROW)) {
       body.add(new Stmt.Return(new Token(RETURN, "return", "return", previous().line++, previous().column++), expression()));
@@ -613,7 +629,7 @@ public class Parser {
       body = block();
     }
 
-    return new Expr.Lambda(parameters, body);
+    return new Expr.Lambda(parameters, body, isAsync);
   }
 
   private Expr typeof() {
@@ -754,7 +770,16 @@ public class Parser {
   }
 
   private Expr unary() {
-    if (match(BANG, MINUS, PLUS_PLUS, MINUS_MINUS)) {
+    if (match(NEW)) {
+      Token keyword = previous();
+      Expr constructor = call();
+
+      if (!(constructor instanceof Expr.Call)) {
+        throw error(keyword, "Expect '(' after class name.");
+      }
+
+      return new Expr.New(keyword, (Expr.Call) constructor);
+    } else if (match(BANG, MINUS, PLUS_PLUS, MINUS_MINUS)) {
       Token operator = previous();
       Expr right = unary();
       return new Expr.Unary(operator, right);
@@ -820,6 +845,10 @@ public class Parser {
     if (match(NULL))
       return new Expr.Literal(null);
 
+    if (match(STRING_PART)) {
+      return finishInterpolation(previous().literal);
+    }
+
     if (match(NUMBER, STRING)) {
       return new Expr.Literal(previous().literal);
     }
@@ -837,6 +866,9 @@ public class Parser {
     if (match(IDENTIFIER)) {
       return new Expr.Variable(previous());
     }
+
+    if (match(MATCH))
+      return matchExpression();
 
     if (match(LEFT_PAREN)) {
       Expr expr = expression();
@@ -876,7 +908,156 @@ public class Parser {
       return lazy();
     }
 
+    if (match(AWAIT)) {
+      Expr value = expression();
+      return new Expr.Await(previous(), value);
+    }
+
     throw error(peek(), "Expect expression.");
+  }
+
+  private Expr finishInterpolation(Object firstPart) {
+    Expr expr = new Expr.Literal(firstPart);
+
+    while (true) {
+      if (match(INTERPOLATION_START)) {
+        Expr inner = expression();
+        consume(RIGHT_BRACE, "Expect '}' after interpolation expression.");
+
+        Token plus = new Token(PLUS, "+", null, previous().line, previous().column);
+        expr = new Expr.Binary(expr, plus, inner);
+      }
+
+      if (match(STRING_PART)) {
+        Token plus = new Token(PLUS, "+", null, previous().line, previous().column);
+        expr = new Expr.Binary(expr, plus, new Expr.Literal(previous().literal));
+      } else if (match(STRING)) {
+        Token plus = new Token(PLUS, "+", null, previous().line, previous().column);
+        expr = new Expr.Binary(expr, plus, new Expr.Literal(previous().literal));
+        break;
+      } else {
+        break;
+      }
+    }
+
+    return expr;
+  }
+
+  private Expr matchExpression() {
+    Token keyword = previous();
+    Expr value = expression();
+    consume(LEFT_BRACE, "Expect '{' before match cases.");
+
+    List<Expr.MatchCase> cases = new ArrayList<>();
+    while (!check(RIGHT_BRACE) && !isAtEnd()) {
+      cases.add(matchCase());
+    }
+
+    consume(RIGHT_BRACE, "Expect '}' after match cases.");
+    return new Expr.Match(keyword, value, cases);
+  }
+
+  private Expr.MatchCase matchCase() {
+    Expr pattern = pattern();
+    Expr guard = null;
+
+    if (match(IF)) {
+      guard = expression();
+    }
+
+    consume(ARROW, "Expect '->' after match pattern.");
+    List<Stmt> body;
+
+    if (match(LEFT_BRACE)) {
+      body = block();
+    } else {
+      Expr expr = expression();
+      body = List.of(new Stmt.Return(new Token(RETURN, "return", "return", previous().line++, previous().column++), expr));
+      consume(SEMICOLON, "Expect ';' after match case body.");
+    }
+
+    return new Expr.MatchCase(pattern, guard, body);
+  }
+
+  private Expr pattern() {
+    if (match(STAR)) {
+      return new Expr.WildcardPattern(previous());
+    }
+
+    if (match(LEFT_BRACKET)) {
+      return listPattern();
+    }
+
+    if (match(LEFT_BRACE)) {
+      return objectPattern();
+    }
+
+    if (check(IDENTIFIER) && checkNext(LEFT_PAREN)) {
+      Token caseName = consume(IDENTIFIER, "Expect case name.");
+      consume(LEFT_PAREN, "Expect '(' after case name.");
+
+      List<Token> bindings = new ArrayList<>();
+      if (!check(RIGHT_PAREN)) {
+        do {
+          bindings.add(consume(IDENTIFIER, "Expect variable name."));
+        } while (match(COMMA));
+      }
+
+      consume(RIGHT_PAREN, "Expect ')' after pattern bindings.");
+      return new Expr.UnionPattern(caseName, bindings);
+    }
+
+    if (match(IDENTIFIER)) {
+      return new Expr.Variable(previous());
+    }
+
+    return primary();
+  }
+
+  private Expr listPattern() {
+    List<Expr> elements = new ArrayList<>();
+    Expr rest = null;
+
+    while (!check(RIGHT_BRACKET) && !isAtEnd()) {
+      if (match(SPREAD)) {
+        rest = expression();
+        break;
+      }
+
+      elements.add(expression());
+
+      if (!check(RIGHT_BRACKET)) {
+        consume(COMMA, "Expect ',' after list pattern elements.");
+      }
+    }
+
+    consume(RIGHT_BRACKET, "Expect ']' after list pattern.");
+    return new Expr.ListPattern(elements, rest);
+  }
+
+  private Expr objectPattern() {
+    List<Expr.ObjectPattern.Property> properties = new ArrayList<>();
+    Expr rest = null;
+
+    while (!check(RIGHT_BRACE) && !isAtEnd()) {
+      if (match(SPREAD)) {
+        rest = expression();
+        break;
+      }
+
+      Token name = consume(IDENTIFIER, "Expect property name.");
+      consume(COLON, "Expect ':' after property name.");
+      Expr pattern = expression();
+
+      properties.add(new Expr.ObjectPattern.Property(name, pattern));
+
+      if (!check(RIGHT_BRACE)) {
+        consume(COMMA, "Expect ',' after property pattern.");
+      }
+    }
+
+    consume(RIGHT_BRACE, "Expect '}' after object pattern.");
+    return new Expr.ObjectPattern(properties, rest);
   }
 
   private boolean match(TokenType... types) {
@@ -900,6 +1081,12 @@ public class Parser {
     if (isAtEnd())
       return false;
     return peek().type == type;
+  }
+
+  private boolean checkNext(TokenType type) {
+    if (isAtEnd()) return false;
+    if (tokens.get(current + 1).type == EOF) return false;
+    return tokens.get(current + 1).type == type;
   }
 
   private Token advance() {
@@ -936,7 +1123,7 @@ public class Parser {
       switch (peek().type) {
         case CLASS, ELSE, FALSE, FN, FOR, IF, NULL,
              RETURN, SUPER, THIS, TRUE, LET, WHILE,
-             EXTENDS, IN, STATIC, MATCH, CASE, WITH,
+             EXTENDS, IN, STATIC, WITH,
              TRAIT, THROW, ENUM, IS, ABSTRACT, TYPEOF,
              LAZY, TRY, CATCH, FINALLY, NAMESPACE,
              USING, FROM:

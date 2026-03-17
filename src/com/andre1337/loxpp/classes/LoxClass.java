@@ -3,7 +3,9 @@ package com.andre1337.loxpp.classes;
 import com.andre1337.loxpp.interpreter.Interpreter;
 import com.andre1337.loxpp.lexer.Token;
 
-import java.util.*;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 public class LoxClass extends LoxInstance implements LoxCallable {
   public final String name;
@@ -13,8 +15,12 @@ public class LoxClass extends LoxInstance implements LoxCallable {
   public final Map<String, LoxFunction> methods;
   public final Interpreter interpreter;
 
+  final LoxClass meta;
+
   public LoxClass(LoxClass meta, String name, Token token, LoxClass superclass, Map<String, LoxFunction> methods, Interpreter interpreter) {
     super(meta);
+
+    this.meta = meta;
 
     this.superclass = superclass;
     this.traits = new HashMap<>();
@@ -45,12 +51,16 @@ public class LoxClass extends LoxInstance implements LoxCallable {
   }
 
   @Override
-  public Object call(Interpreter interpreter, List<Object> arguments) {
+  public Object call(Interpreter interpreter, List<Object> arguments, boolean isNewCall) {
+    if (!isNewCall) {
+      throw new RuntimeError(token, "RuntimeError", "Class constructor '" + name + "' cannot be invoked without 'new'.", null);
+    }
+
     LoxInstance instance = new LoxInstance(this);
     LoxFunction initializer = findMethod("init");
 
     if (initializer != null) {
-      initializer.bind(instance).call(interpreter, arguments);
+      initializer.bind(instance).call(interpreter, arguments, false);
     }
 
     return instance;

@@ -3,17 +3,17 @@ package com.andre1337.loxpp.sema;
 import com.andre1337.loxpp.Lox;
 import com.andre1337.loxpp.ast.Expr;
 import com.andre1337.loxpp.ast.Stmt;
-import com.andre1337.loxpp.interpreter.InterpreterOG;
+import com.andre1337.loxpp.interpreter.Interpreter;
 import com.andre1337.loxpp.lexer.Token;
 
 import java.util.*;
 
-public class ResolverOG implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
-  private final InterpreterOG interpreter;
+public class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
+  private final Interpreter interpreter;
   private final Stack<Map<String, Boolean>> scopes = new Stack<>();
   private FunctionType currentFunction = FunctionType.NONE;
 
-  public ResolverOG(InterpreterOG interpreter) {
+  public Resolver(Interpreter interpreter) {
     this.interpreter = interpreter;
   }
 

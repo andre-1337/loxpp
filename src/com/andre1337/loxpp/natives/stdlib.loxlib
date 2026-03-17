@@ -1,10 +1,7 @@
-// The standard library for Lox++.
-// This implementation of Lox implements traits, alongside with abstract methods,
-// objects, arrays, namespaces, static methods, and a fairly complete standard
-// library that provides collections, some base traits that actually provide
-// functionality to the language and other useful constructs.
-
-// This standard library was updated at: 26/08/2024
+// LOXPP STANDARD LIBRARY VERSION 2
+// THIS IS THE COMPLETE IMPLEMENTATION OF LOXPP'S STANDARD LIBRARY
+// CONTAINS OBJECTS VITAL TO THE CORE LANGUAGE
+// LAST UPDATED: 19/02/2026
 
 trait Throwable {
     abstract fn message();
@@ -98,7 +95,7 @@ namespace std {
                 }
             }
 
-            fn iterator() -> ListIterator(self);
+            fn iterator() -> new ListIterator(self);
 
             fn add(element) -> self.elements.insert(element);
 
@@ -190,12 +187,10 @@ namespace std {
                 }
             }
 
-            fn iterator() {
-                return LinkedListIterator(self);
-            }
+            fn iterator() -> new LinkedListIterator(self);
 
             fn add(value) {
-                let new_node = ListNode(value, null);
+                let new_node = new ListNode(value, null);
                 if self.head == null {
                     self.head = new_node;
                     self.tail = new_node;
@@ -257,7 +252,7 @@ namespace std {
                 }
             }
 
-            fn iterator() -> MapIterator(self);
+            fn iterator() -> new MapIterator(self);
 
             fn get(key) {
                 for element in self.elements {
@@ -273,7 +268,7 @@ namespace std {
                         return;
                     }
                 }
-                self.elements.insert(Pair(key, value));
+                self.elements.insert(new Pair(key, value));
             }
 
             fn remove(key) {
@@ -341,7 +336,7 @@ namespace std {
 
             fn pop() {
                 if self.items.is_empty() {
-                    throw Error("Stack is empty.");
+                    throw new Error("Stack is empty.");
                 }
 
                 return self.items.remove(self.items.len() - 1);
@@ -349,7 +344,7 @@ namespace std {
 
             fn peek() {
                 if self.items.is_empty() {
-                    throw Error("Stack is empty.");
+                    throw new Error("Stack is empty.");
                 }
 
                 return self.items[self.items.len() - 1];
@@ -374,6 +369,8 @@ namespace std {
                 return res;
             }
         }
+
+        export List, ListIterator, ListNode, LinkedList, LinkedListIterator, Pair, Map, MapIterator, Stack;
     }
 
     namespace Math {
@@ -403,7 +400,7 @@ namespace std {
         fn pow(base, exp) -> base ** exp;
 
         fn ceil(x) {
-            let int_part = Math.int(x);
+            let int_part = int(x);
             if x > int_part return int_part + 1;
             else return int_part;
         }
@@ -412,6 +409,59 @@ namespace std {
             let int_part = Math.int(x);
             if x < int_part return int_part - 1;
             else return int_part;
+        }
+
+        fn clamp(n, min, max) {
+            if n < min {
+                return min;
+            }
+
+            if n > max {
+                return max;
+            }
+
+            return n;
+        }
+
+        fn factorial(n) {
+            let res = 1;
+            let i = 2;
+
+            for (i = 2; i < n; i = i + 1) {
+                res = res * i;
+            }
+
+            return res;
+        }
+
+        fn gcd(n, other) {
+            let a = std.Math.abs(n);
+            let b = std.Math.abs(other);
+
+            while b != 0 {
+                let temp = b;
+                b = a % b;
+                a = temp;
+            }
+
+            return a;
+        }
+
+        fn lcm(n, other) {
+            return std.Math.abs(n * other) / std.Math.gcd(n, other);
+        }
+
+        fn exp(num) {
+            let result = 1;
+            let term = 1;
+            let n = 1;
+
+            for (n = 1; n < 20; n = n + 1) {
+                term = term * num / n;
+                result = result + term;
+            }
+
+            return result;
         }
 
         fn int(x) {
@@ -437,6 +487,8 @@ namespace std {
         let Sqrt5 = 2.23606797749979;
         let NLog2 = 0.6931471805599453;
         let NLog10 = 2.3025850929940456;
+
+        export abs, sqrt, min, max, sin, cos, tan, pow, ceil, floor, clamp, factorial, gcd, lcm, exp, int, random, random_with_range, PI, Euler, Phi, EulerMascheroni, Sqrt2, Sqrt3, Sqrt5, NLog2, NLog10;
     }
 
     class String with Printable {
@@ -445,7 +497,7 @@ namespace std {
         }
 
         fn empty() {
-            return String("");
+            return new String("");
         }
 
         fn length() {
@@ -517,7 +569,11 @@ namespace std {
         }
 
         fn sleep(time) -> ___sleep___(time);
+
+        export timer, sleep;
     }
+
+    export Collections, Math, String, System;
 }
 
 class Range with Iterable, Printable {
@@ -563,118 +619,349 @@ class Range with Iterable, Printable {
     }
 }
 
-class Result {
-    fn init(type, value, error) {
-        self.type = type;
-        self.value = value;
-        self.error = error;
-    }
+enum Option union {
+    Some(value)
+    | None
+}
 
-    static fn Ok(value) {
-        return Result("Ok", value, null);
-    }
+impl Option {
+    fn is_some() -> match self {
+        Some(value) -> true;
+        None() -> false;
+    };
 
-    static fn Err(error) {
-        return Result("Err", null, error);
-    }
+    fn is_none() -> match self {
+        Some(value) -> false;
+        None() -> true;
+    };
 
-    fn is_ok() {
-        return self.type == "Ok";
-    }
-
-    fn is_err() {
-        return self.type == "Err";
-    }
-
-    fn unwrap() {
-        if self.is_err() {
-            throw Error("Called Result#unwrap() on an 'Err' value: " + self.error);
+    fn unwrap() -> match self {
+        Some(value) -> value;
+        None -> {
+            throw new Error("Called Option#unwrap() on an 'Err' value");
         }
+    };
 
-        return self.value;
-    }
+    fn unwrap_or(default) -> match self {
+        Some(value) -> value;
+        * -> default;
+    };
 
-    fn unwrap_or(default) {
-        if self.is_ok() return self.value;
-        return default;
-    }
+    fn map(transform) -> match self {
+        Some(value) -> Option.Some(transform(value));
+        * -> self;
+    };
 
-    fn map(transform) {
-        if self.is_ok() return Result.Ok(transform(self.value));
-        return self;
-    }
+    fn filter(predicate) -> match self {
+        Some(value) if predicate(value) -> self;
+        * -> Option.None();
+    };
 
-    fn map_err(transform) {
-        if self.is_err() return Result.Err(transform(self.error));
-        return self;
-    }
+    fn and(option) -> match self {
+        Some(_) -> option;
+        * -> Option.None();
+    };
 
-    fn and_then(callback) {
-        if self.is_ok() return callback(self.value);
-        return self;
-    }
+    fn or(option) -> match self {
+        Some(_) -> self;
+        * -> option;
+    };
+}
 
-    fn or_else(callback) {
-        if self.is_err() return callback(self.error);
-        return self;
+enum Result union {
+    Ok(value)
+    | Err(message)
+}
+
+impl Result {
+    fn is_ok() -> match self {
+        Ok(_) -> true;
+        Err(_) -> false;
+    };
+
+    fn is_err() -> match self {
+        Ok(_) -> false;
+        Err(_) -> true;
+    };
+
+    fn unwrap() -> match self {
+        Ok(value) -> value;
+        Err(message) -> {
+            throw new Error("Called Result#unwrap() on an 'Err' value: $message");
+        }
+    };
+
+    fn unwrap_or(default) -> match self {
+        Ok(value) -> value;
+        * -> default;
+    };
+
+    fn map(transform) -> match self {
+        Ok(value) -> Result.Ok(transform(value));
+        * -> self;
+    };
+
+    fn map_err(transform) -> match self {
+        Err(message) -> Result.Err(transform(message));
+        * -> self;
+    };
+
+    fn and_then(callback) -> match self {
+        Ok(value) -> callback(value);
+        * -> self;
+    };
+
+    fn or_else(callback) -> match self {
+        Err(message) -> callback(message);
+        * -> self;
+    };
+}
+
+class Request {
+    fn init(method, path, headers, body, query, json, params) {
+        self.method = method;
+        self.path = path;
+        self.headers = headers;
+        self.body = body;
+        self.query = query;
+        self.json = json;
+        self.params = params;
     }
 }
 
-class Option {
-    fn init(type, value) {
-        self.type = type;
-        self.value = value;
+class Response {
+    fn init(client_socket) {
+        self.socket = client_socket;
+        self.status_code = 200;
+        self.headers = [
+            "Content-Type: text/plain",
+            "Connection: close"
+        ];
+        self.is_sent = false;
     }
 
-    static fn Some(value) {
-        return Option("Some", value);
-    }
-
-    static fn None() {
-        return Option("None", null);
-    }
-
-    fn is_some() {
-        return self.type == "Some";
-    }
-
-    fn is_none() {
-        return self.type == "None";
-    }
-
-    fn unwrap() {
-        if self.is_none() {
-            throw Error("Called Option#unwrap() on a 'None' value");
-        }
-
-        return self.value;
-    }
-
-    fn unwrap_or(default) {
-        if self.is_some() return self.value;
-        return default;
-    }
-
-    fn map(transform) {
-        if self.is_some() return Option.Some(transform(self.value));
+    fn async status(code) {
+        self.status_code = code;
         return self;
     }
 
-    fn filter(predicate) {
-        if self.is_some() && predicate(self.value) {
-            return self;
+    fn async set_header(header_string) {
+        self.headers.insert(header_string);
+        return self;
+    }
+
+    private fn async get_status_text() -> match self.status_code {
+        200 -> "OK";
+        201 -> "Created";
+        400 -> "Bad Request";
+        404 -> "Not Found";
+        500 -> "Internal Server Error";
+
+        * -> "Unknown";
+    };
+
+    fn async build_payload(body) {
+        let status_text = await self.get_status_text();
+        let response_text = "HTTP/1.1 ${self.status_code} ${status_text}\r\n";
+
+        for header in self.headers {
+            response_text = response_text + header + "\r\n";
         }
 
-        return Option.None();
+        response_text = response_text + "\r\n" + body;
+        return response_text;
     }
 
-    fn and(option) {
-        if self.is_some() return option;
-        return Option.None();
+    fn async send(body) {
+        self.is_sent = true;
+        await self.set_header("Content-Length: ${body.len()}");
+        let payload = await self.build_payload(body);
+
+        println("Writing ${body.len()} bytes to socket...");
+        await ___tcp_write___(self.socket, payload);
+        await ___tcp_close___(self.socket);
+
+        println("Socket closed successfully.");
     }
 
-    fn or(option) {
-        if self.is_some() return self;
-        return option;
+    fn async json(data) {
+        self.is_sent = true;
+        await self.set_header("Content-Type: application/json");
+        let json_string = stringify_json(data);
+        await self.send(json_string);
+    }
+
+    fn async send_file(file_path) {
+        self.is_sent = true;
+        let content = read_file(file_path);
+
+        if content == null {
+            await self.set_header("Content-Type: text/plain; charset=utf-8");
+            await self.send("404: File not found on disk");
+            return null;
+        }
+
+        let mime_type = "text/plain; charset=utf-8";
+
+        if file_path.ends_with(".html") {
+            mime_type = "text/html; charset=utf-8";
+        } else if file_path.ends_with(".css") {
+            mime_type = "text/css; charset=utf-8";
+        } else if file_path.ends_with(".js") {
+            mime_type = "application/javascript; charset=utf-8";
+        } else if file_path.ends_with(".json") {
+            mime_type = "application/json; charset=utf-8";
+        }
+
+        await self.set_header("Content-Type: ${mime_type}");
+        await self.send(content);
+    }
+}
+
+class Server {
+    fn init() {
+        self.routes = [];
+        self.middlewares = [];
+    }
+
+    fn async get(path, handler) {
+        self.routes.insert(["GET", path, handler]);
+    }
+
+    fn async post(path, handler) {
+        self.routes.insert(["POST", path, handler]);
+    }
+
+    fn async use(middleware_function) {
+        self.middlewares.insert(middleware_function);
+    }
+
+    private fn async parse_request(raw_http_string) {
+        if raw_http_string == null return new Request("GET", "/", [], "", null, {});
+
+        let http_parts = raw_http_string.split("\r\n\r\n");
+        let head_section = http_parts[0];
+
+        let body = "";
+        let json_data = null;
+
+        if http_parts.len() > 1 {
+            body = http_parts[1];
+
+            if body.len() > 0 && body.starts_with("{") {
+                json_data = parse_json(body);
+            }
+        }
+
+        let lines = head_section.split("\r\n");
+        if lines.len() == 0 return new Request("GET", "/", [], body, null, {});
+
+        let request_line = lines[0].split(" ");
+        if request_line.len() < 2 return new Request("GET", "/", [], body, null, {});
+
+        let method = request_line[0];
+        let full_path = request_line[1];
+        let path = full_path;
+        let query_dict = {};
+
+        if full_path.contains("?") {
+            let path_parts = full_path.split("[?]");
+            path = path_parts[0];
+
+            if path_parts.len() > 1 {
+                let query_string = path_parts[1];
+                let pairs = query_string.split("&");
+
+                for pair in pairs {
+                    let kv = pair.split("=");
+
+                    if kv.len() == 2 {
+                        let key = kv[0];
+                        let value = kv[1];
+
+                        query_dict[key] = value;
+                    }
+                }
+            }
+        }
+
+        return new Request(method, path, [], body, query_dict, json_data, {});
+    }
+
+    private fn async handle_connection(client) {
+        let raw_data = await ___tcp_read___(client, 4096);
+
+        if raw_data == null {
+            await ___tcp_close___(client);
+            return null;
+        }
+
+        let req = await self.parse_request(raw_data);
+        let res = new Response(client);
+
+        for middleware in self.middlewares {
+            await middleware(req, res);
+
+            if res.is_sent {
+                return null;
+            }
+        }
+
+        let handled = false;
+
+        for route in self.routes {
+            let route_method = route[0];
+            let route_path = route[1];
+            let handler = route[2];
+
+            if req.method == route_method && !handled {
+                let req_parts = req.path.split("/");
+                let route_parts = route_path.split("/");
+
+                if req_parts.len() == route_parts.len() {
+                    let is_match = true;
+                    let extracted_params = {};
+
+                    let i = 0;
+                    while i < req_parts.len() && is_match {
+                        let r_part = route_parts[i];
+                        let p_part = req_parts[i];
+
+                        if r_part.starts_with(":") {
+                            let param_name = r_part.substring(1, r_part.len());
+                            extracted_params[param_name] = p_part;
+                        } else if r_part != p_part {
+                            is_match = false;
+                        }
+
+                        i = i + 1;
+                    }
+
+                    if is_match {
+                        req.params = extracted_params;
+                        await handler(req, res);
+                        handled = true;
+                    }
+                }
+            }
+        }
+
+        if !handled {
+            await res.status(404);
+            await res.send("404 - Page Not Found");
+        }
+    }
+
+    fn async listen(port, callback) {
+        let server = await ___tcp_bind___(port);
+        await callback(port);
+
+        while true {
+            let client = await ___tcp_accept___(server);
+
+            if client != null {
+                await self.handle_connection(client);
+            }
+        }
     }
 }

@@ -2,10 +2,7 @@ package com.andre1337.loxpp.lexer;
 
 import com.andre1337.loxpp.Lox;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import static com.andre1337.loxpp.lexer.TokenType.*;
 
@@ -30,8 +27,6 @@ public class Scanner {
     keywords.put("extends", EXTENDS);
     keywords.put("in", IN);
     keywords.put("static", STATIC);
-    keywords.put("match", MATCH);
-    keywords.put("case", CASE);
     keywords.put("trait", TRAIT);
     keywords.put("with", WITH);
     keywords.put("throw", THROW);
@@ -45,6 +40,16 @@ public class Scanner {
     keywords.put("namespace", NAMESPACE);
     keywords.put("using", USING);
     keywords.put("from", FROM);
+    keywords.put("union", UNION);
+    keywords.put("match", MATCH);
+    keywords.put("impl", IMPL);
+    keywords.put("async", ASYNC);
+    keywords.put("await", AWAIT);
+    keywords.put("try", TRY);
+    keywords.put("private", PRIVATE);
+    keywords.put("export", EXPORT);
+    keywords.put("new", NEW);
+    keywords.put("field", FIELD);
   }
 
   private final String source;
@@ -53,6 +58,7 @@ public class Scanner {
   private int current = 0;
   private int line = 1;
   private int column = 0;
+  private int interpolationDepth = 0;
 
   public Scanner(String source) {
     this.source = source;
@@ -80,11 +86,21 @@ public class Scanner {
         break;
 
       case '{':
+        if (interpolationDepth > 0) interpolationDepth++;
         addToken(LEFT_BRACE);
         break;
 
       case '}':
         addToken(RIGHT_BRACE);
+
+        if (interpolationDepth > 0) {
+          interpolationDepth--;
+          if (interpolationDepth == 0) {
+            start = current;
+            string();
+          }
+        }
+
         break;
 
       case '[':
@@ -121,6 +137,10 @@ public class Scanner {
 
       case '.':
         addToken(match('.') ? (match('.') ? SPREAD : DOT_DOT) : DOT);
+        break;
+
+      case '$':
+          addToken(IDENTIFIER);
         break;
 
       case '-':
@@ -203,13 +223,11 @@ public class Scanner {
   }
 
   private void identifier() {
-    while (isAlphaNumeric(peek()))
-      advance();
+    while (isAlphaNumeric(peek())) advance();
 
     String text = source.substring(start, current);
     TokenType type = keywords.get(text);
-    if (type == null)
-      type = IDENTIFIER;
+    if (type == null) type = IDENTIFIER;
     addToken(type);
   }
 
@@ -227,35 +245,29 @@ public class Scanner {
     addToken(NUMBER, Double.parseDouble(source.substring(start, current)));
   }
 
-  private char lexEscapeCharacter() {
-    if (isAtEnd()) return '\0';
-    char next = advance();
-    return switch (next) {
-      case '0' -> '\0';
-      case 'n' -> '\n';
-      case 't' -> '\t';
-      case 'r' -> '\r';
-      case 'b' -> '\b';
-      case 'f' -> '\f';
-      case '"' -> '"';
-      case '\\' -> '\\';
-      default -> next;
-    };
-  }
-
   private void string() {
-    StringBuilder value = new StringBuilder();
+    while (!isAtEnd() && peek() != '"') {
+      if (peek() == '$' && peekNext() == '{') {
+        int trimStart = (source.charAt(start) == '"') ? start + 1 : start;
 
-    while (peek() != '"' && !isAtEnd()) {
-      if (peek() == '\n') {
-        line++;
-      } else if (peek() == '\\') {
-        advance();
-        char escapedChar = lexEscapeCharacter();
-        value.append(escapedChar);
-      } else {
-        value.append(advance());
+        addToken(STRING_PART, source.substring(trimStart, current));
+
+        advance(); // $
+        advance(); // {
+        interpolationDepth = 1;
+        addToken(INTERPOLATION_START);
+
+        return;
       }
+
+      if (peek() == '\\') {
+        advance();
+        advance();
+        continue;
+      }
+
+      if (peek() == '\n') line++;
+      advance();
     }
 
     if (isAtEnd()) {
@@ -264,7 +276,18 @@ public class Scanner {
     }
 
     advance();
-    addToken(STRING, value.toString());
+
+    int beginIndex = (source.charAt(start) == '"') ? start + 1 : start;
+    beginIndex = Math.min(beginIndex, current - 1);
+
+    String value = source.substring(beginIndex, current - 1);
+    value = value.replace("\\n", "\n")
+            .replace("\\r", "\r")
+            .replace("\\t", "\t")
+            .replace("\\\"", "\"")
+            .replace("\\\\", "\\");
+
+    addToken(STRING, value);
   }
 
   private boolean match(char expected) {
@@ -278,6 +301,7 @@ public class Scanner {
     return true;
   }
 
+  @SuppressWarnings("unused")
   private boolean checkSequence(String expected) {
     if (isAtEnd())
       return false;

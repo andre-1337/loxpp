@@ -12,7 +12,7 @@ public abstract class LoxNative implements LoxCallable {
         }
 
         @Override
-        public Object call(Interpreter interpreter, List<Object> arguments) {
+        public Object call(Interpreter interpreter, List<Object> arguments, boolean isNewCall) {
             return (double) System.currentTimeMillis();
         }
 
@@ -29,7 +29,7 @@ public abstract class LoxNative implements LoxCallable {
         }
 
         @Override
-        public Object call(Interpreter interpreter, List<Object> arguments) {
+        public Object call(Interpreter interpreter, List<Object> arguments, boolean isNewCall) {
             return Math.random();
         }
 
@@ -46,7 +46,7 @@ public abstract class LoxNative implements LoxCallable {
         }
 
         @Override
-        public Object call(Interpreter interpreter, List<Object> arguments) {
+        public Object call(Interpreter interpreter, List<Object> arguments, boolean isNewCall) {
             return Math.sin((Double) arguments.getFirst());
         }
 
@@ -63,7 +63,7 @@ public abstract class LoxNative implements LoxCallable {
         }
 
         @Override
-        public Object call(Interpreter interpreter, List<Object> arguments) {
+        public Object call(Interpreter interpreter, List<Object> arguments, boolean isNewCall) {
             return Math.cos((Double) arguments.getFirst());
         }
 
@@ -80,7 +80,7 @@ public abstract class LoxNative implements LoxCallable {
         }
 
         @Override
-        public Object call(Interpreter interpreter, List<Object> arguments) {
+        public Object call(Interpreter interpreter, List<Object> arguments, boolean isNewCall) {
             return Math.tan((Double) arguments.getFirst());
         }
 
@@ -91,26 +91,19 @@ public abstract class LoxNative implements LoxCallable {
     }
 
     public static class Print extends LoxNative {
-        private boolean silentExecution;
-
-        public Print(boolean silentExecution) {
-            this.silentExecution = silentExecution;
-        }
-
         @Override
         public int arity() {
             return -1;
         }
 
         @Override
-        public Object call(Interpreter interpreter, List<Object> arguments) {
+        public Object call(Interpreter interpreter, List<Object> arguments, boolean isNewCall) {
             List<String> strings = new ArrayList<>();
             for (Object arg : arguments) {
                 strings.add(Interpreter.stringify(arg));
             }
             String formattedString = String.join(" ", strings);
-
-            if (!silentExecution) System.out.print(formattedString);
+            System.out.print(formattedString);
 
             return null;
         }
@@ -122,25 +115,19 @@ public abstract class LoxNative implements LoxCallable {
     }
 
     public static class Println extends LoxNative {
-        private boolean silentExecution;
-
-        public Println(boolean silentExecution) {
-            this.silentExecution = silentExecution;
-        }
-
         @Override
         public int arity() {
             return -1;
         }
 
         @Override
-        public Object call(Interpreter interpreter, List<Object> arguments) {
+        public Object call(Interpreter interpreter, List<Object> arguments, boolean isNewCall) {
             List<String> strings = new ArrayList<>();
             for (Object arg : arguments) {
                 strings.add(Interpreter.stringify(arg));
             }
             String formattedString = String.join(" ", strings);
-            if (!silentExecution) System.out.println(formattedString);
+            System.out.println(formattedString);
             return null;
         }
 
@@ -151,25 +138,19 @@ public abstract class LoxNative implements LoxCallable {
     }
 
     public static class Debug extends LoxNative {
-        private boolean silentExecution;
-
-        public Debug(boolean silentExecution) {
-            this.silentExecution = silentExecution;
-        }
-
         @Override
         public int arity() {
             return -1;
         }
 
         @Override
-        public Object call(Interpreter interpreter, List<Object> arguments) {
+        public Object call(Interpreter interpreter, List<Object> arguments, boolean isNewCall) {
             List<String> strings = new ArrayList<>();
             for (Object arg : arguments) {
                 strings.add(Interpreter.stringify(arg));
             }
             String formattedString = String.join(" ", strings);
-            if (!silentExecution) System.err.format("[debug] %s\n", formattedString);
+            System.err.format("[debug] %s\n", formattedString);
             return null;
         }
 
@@ -186,7 +167,7 @@ public abstract class LoxNative implements LoxCallable {
         }
 
         @Override
-        public Object call(Interpreter interpreter, List<Object> arguments) {
+        public Object call(Interpreter interpreter, List<Object> arguments, boolean isNewCall) {
             int time = (int) (double) arguments.getFirst();
             try {
                 Thread.sleep(time);
@@ -211,7 +192,7 @@ public abstract class LoxNative implements LoxCallable {
         }
 
         @Override
-        public Object call(Interpreter interpreter, List<Object> arguments) {
+        public Object call(Interpreter interpreter, List<Object> arguments, boolean isNewCall) {
             return Interpreter.stringify(arguments.getFirst());
         }
     }

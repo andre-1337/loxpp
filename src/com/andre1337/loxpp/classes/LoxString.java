@@ -6,12 +6,10 @@ import com.andre1337.loxpp.lexer.Token;
 import java.util.*;
 
 public class LoxString {
-    public final Interpreter interpreter;
     public String value;
     private Map<String, LoxCallable> methods = new HashMap<>();
 
-    public LoxString(Interpreter interpreter, String value) {
-        this.interpreter = interpreter;
+    public LoxString(String value) {
         this.value = value;
         this.methods = createMethods(this);
     }
@@ -29,14 +27,14 @@ public class LoxString {
     private static Map<String, LoxCallable> createMethods(LoxString string) {
         Map<String, LoxCallable> methods = new HashMap<>();
 
-        methods.put("length", new LoxCallable() {
+        methods.put("len", new LoxCallable() {
             @Override
             public int arity() {
                 return 0;
             }
 
             @Override
-            public Object call(Interpreter interpreter, List<Object> arguments) {
+            public Object call(Interpreter interpreter, List<Object> arguments, boolean isNewCall) {
                 return (double) string.value.length();
             }
         });
@@ -48,7 +46,7 @@ public class LoxString {
             }
 
             @Override
-            public Object call(Interpreter interpreter, List<Object> arguments) {
+            public Object call(Interpreter interpreter, List<Object> arguments, boolean isNewCall) {
                 return string.value.isEmpty();
             }
         });
@@ -60,7 +58,7 @@ public class LoxString {
             }
 
             @Override
-            public Object call(Interpreter interpreter, List<Object> arguments) {
+            public Object call(Interpreter interpreter, List<Object> arguments, boolean isNewCall) {
                 return string.value.charAt((int) (double) arguments.getFirst());
             }
         });
@@ -72,7 +70,7 @@ public class LoxString {
             }
 
             @Override
-            public Object call(Interpreter interpreter, List<Object> arguments) {
+            public Object call(Interpreter interpreter, List<Object> arguments, boolean isNewCall) {
                 int start = (int) (double) arguments.getFirst();
                 int end = (int) (double) arguments.get(1);
                 return string.value.substring(start, end);
@@ -86,7 +84,7 @@ public class LoxString {
             }
 
             @Override
-            public Object call(Interpreter interpreter, List<Object> arguments) {
+            public Object call(Interpreter interpreter, List<Object> arguments, boolean isNewCall) {
                 String substring = ((LoxString) arguments.getFirst()).value;
                 return string.value.indexOf(substring);
             }
@@ -99,8 +97,8 @@ public class LoxString {
             }
 
             @Override
-            public Object call(Interpreter interpreter, List<Object> arguments) {
-                String substring = ((LoxString) arguments.getFirst()).value;
+            public Object call(Interpreter interpreter, List<Object> arguments, boolean isNewCall) {
+                String substring = string.unpack_type(arguments.getFirst());
                 return string.value.contains(substring);
             }
         });
@@ -112,7 +110,7 @@ public class LoxString {
             }
 
             @Override
-            public Object call(Interpreter interpreter, List<Object> arguments) {
+            public Object call(Interpreter interpreter, List<Object> arguments, boolean isNewCall) {
                 return string.value.toUpperCase();
             }
         });
@@ -124,7 +122,7 @@ public class LoxString {
             }
 
             @Override
-            public Object call(Interpreter interpreter, List<Object> arguments) {
+            public Object call(Interpreter interpreter, List<Object> arguments, boolean isNewCall) {
                 return string.value.toLowerCase();
             }
         });
@@ -136,7 +134,7 @@ public class LoxString {
             }
 
             @Override
-            public Object call(Interpreter interpreter, List<Object> arguments) {
+            public Object call(Interpreter interpreter, List<Object> arguments, boolean isNewCall) {
                 return string.value.trim();
             }
         });
@@ -148,9 +146,14 @@ public class LoxString {
             }
 
             @Override
-            public Object call(Interpreter interpreter, List<Object> arguments) {
-                String delimiter = ((LoxString) arguments.getFirst()).value;
-                List<Object> elements = new ArrayList<>(Arrays.asList(string.value.split(delimiter)));
+            public Object call(Interpreter interpreter, List<Object> arguments, boolean isNewCall) {
+                String delimiter = string.unpack_type(arguments.getFirst());
+                List<Object> elements = new ArrayList<>();
+
+                for (String part : string.value.split(delimiter)) {
+                    elements.add(new LoxString(part));
+                }
+
                 return new LoxArray(interpreter, elements);
             }
         });
@@ -162,7 +165,7 @@ public class LoxString {
             }
 
             @Override
-            public Object call(Interpreter interpreter, List<Object> arguments) {
+            public Object call(Interpreter interpreter, List<Object> arguments, boolean isNewCall) {
                 String value = string.unpack_type(arguments.getFirst());
                 string.value += value;
                 return null;
@@ -176,7 +179,7 @@ public class LoxString {
             }
 
             @Override
-            public Object call(Interpreter interpreter, List<Object> arguments) {
+            public Object call(Interpreter interpreter, List<Object> arguments, boolean isNewCall) {
                 String value = string.value;
                 String other = ((LoxString) arguments.getFirst()).value;
                 return value.equals(other);
@@ -190,10 +193,10 @@ public class LoxString {
             }
 
             @Override
-            public Object call(Interpreter interpreter, List<Object> arguments) {
+            public Object call(Interpreter interpreter, List<Object> arguments, boolean isNewCall) {
                 String value = string.value;
                 int length = (int) (double) arguments.getFirst();
-                return new LoxString(interpreter, value.repeat(length));
+                return new LoxString(value.repeat(length));
             }
         });
 
@@ -204,9 +207,9 @@ public class LoxString {
             }
 
             @Override
-            public Object call(Interpreter interpreter, List<Object> arguments) {
+            public Object call(Interpreter interpreter, List<Object> arguments, boolean isNewCall) {
                 String value = string.value;
-                String match = (String) arguments.getFirst();
+                String match = string.unpack_type(arguments.getFirst());
 
                 return value.startsWith(match);
             }
@@ -219,9 +222,9 @@ public class LoxString {
             }
 
             @Override
-            public Object call(Interpreter interpreter, List<Object> arguments) {
+            public Object call(Interpreter interpreter, List<Object> arguments, boolean isNewCall) {
                 String value = string.value;
-                String match = (String) arguments.getFirst();
+                String match = string.unpack_type(arguments.getFirst());
 
                 return value.endsWith(match);
             }
@@ -234,7 +237,7 @@ public class LoxString {
             }
 
             @Override
-            public Object call(Interpreter interpreter, List<Object> arguments) {
+            public Object call(Interpreter interpreter, List<Object> arguments, boolean isNewCall) {
                 return Double.parseDouble(string.value);
             }
         });
@@ -246,7 +249,7 @@ public class LoxString {
             }
 
             @Override
-            public Object call(Interpreter interpreter, List<Object> arguments) {
+            public Object call(Interpreter interpreter, List<Object> arguments, boolean isNewCall) {
                 try {
                     Double.parseDouble(string.value);
                     return true;
@@ -273,8 +276,16 @@ public class LoxString {
     }
 
     @Override
-    public boolean equals(Object obj) {
-        assert obj instanceof LoxString;
-        return value.equals(((LoxString) obj).value);
+    public boolean equals(Object other) {
+        if (other == null) {
+            return false;
+        }
+
+        if (!(other instanceof LoxString)) {
+            return false;
+        }
+
+        LoxString obj = (LoxString) other;
+        return this.value.equals(obj.value);
     }
 }

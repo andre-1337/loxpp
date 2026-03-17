@@ -7,6 +7,7 @@ import java.util.*;
 public class LoxNamespace {
     public final String name;
     public final Map<String, Object> members  = new HashMap<>();
+    public final Set<String> publicNames = new HashSet<>();
 
     public LoxNamespace(String name) {
         this.name = name;
@@ -16,13 +17,29 @@ public class LoxNamespace {
         members.put(name, value);
     }
 
-    public Object get(Token obj) {
+    public void markAsPublic(String name) {
+        publicNames.add(name);
+    }
+
+    public Object getExported(Token name) {
+        if (publicNames.contains(name.lexeme)) {
+            return members.get(name.lexeme);
+        }
+
+        if (members.containsKey(name.lexeme)) {
+            throw new RuntimeError(name, "RuntimeError", "Member '" + name.lexeme + "' is internal to namespace '" + this.name + "'.", null);
+        }
+
+        throw new RuntimeError(name, "RuntimeError", "Undefined member '" + name.lexeme + "'.", null);
+    }
+
+    /*public Object get(Token obj) {
         if (members.containsKey(obj.lexeme)) {
             return members.get(obj.lexeme);
         }
 
         throw new RuntimeError(obj, "RuntimeError", "Undefined member '" + obj.lexeme + "' in namespace '" + name + "'.", null);
-    }
+    }*/
 
     @Override
     public String toString() {

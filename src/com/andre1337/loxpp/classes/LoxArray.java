@@ -32,7 +32,7 @@ public class LoxArray implements LoxIndexable {
             }
 
             @Override
-            public Object call(Interpreter interpreter, List<Object> arguments) {
+            public Object call(Interpreter interpreter, List<Object> arguments, boolean isNewCall) {
                 int idx = (Integer) arguments.getFirst();
 
                 try {
@@ -53,7 +53,7 @@ public class LoxArray implements LoxIndexable {
             }
 
             @Override
-            public Object call(Interpreter interpreter, List<Object> arguments) {
+            public Object call(Interpreter interpreter, List<Object> arguments, boolean isNewCall) {
                 array.elements.addAll(arguments);
                 return null;
             }
@@ -66,7 +66,7 @@ public class LoxArray implements LoxIndexable {
             }
 
             @Override
-            public Object call(Interpreter interpreter, List<Object> arguments) {
+            public Object call(Interpreter interpreter, List<Object> arguments, boolean isNewCall) {
                 try {
                     return array.elements.removeFirst();
                 } catch (IndexOutOfBoundsException e) {
@@ -82,7 +82,7 @@ public class LoxArray implements LoxIndexable {
             }
 
             @Override
-            public Object call(Interpreter interpreter, List<Object> arguments) {
+            public Object call(Interpreter interpreter, List<Object> arguments, boolean isNewCall) {
                 Double index = (Double) arguments.getFirst();
                 int idx = index.intValue();
 
@@ -103,7 +103,7 @@ public class LoxArray implements LoxIndexable {
             }
 
             @Override
-            public Object call(Interpreter interpreter, List<Object> arguments) {
+            public Object call(Interpreter interpreter, List<Object> arguments, boolean isNewCall) {
                 return (double) array.length();
             }
         });
@@ -115,7 +115,7 @@ public class LoxArray implements LoxIndexable {
             }
 
             @Override
-            public Object call(Interpreter interpreter, List<Object> arguments) {
+            public Object call(Interpreter interpreter, List<Object> arguments, boolean isNewCall) {
                 Collections.shuffle(array.elements);
                 return null;
             }
@@ -128,7 +128,7 @@ public class LoxArray implements LoxIndexable {
             }
 
             @Override
-            public Object call(Interpreter interpreter, List<Object> arguments) {
+            public Object call(Interpreter interpreter, List<Object> arguments, boolean isNewCall) {
                 return array.elements.isEmpty();
             }
         });
@@ -140,7 +140,7 @@ public class LoxArray implements LoxIndexable {
             }
 
             @Override
-            public Object call(Interpreter interpreter, List<Object> arguments) {
+            public Object call(Interpreter interpreter, List<Object> arguments, boolean isNewCall) {
                 array.elements.clear();
                 return null;
             }
@@ -153,12 +153,12 @@ public class LoxArray implements LoxIndexable {
             }
 
             @Override
-            public Object call(Interpreter interpreter, List<Object> arguments) {
+            public Object call(Interpreter interpreter, List<Object> arguments, boolean isNewCall) {
                 LoxFunction callback = (LoxFunction) arguments.getFirst();
                 List<Object> result = new ArrayList<>();
 
                 for (Object item : array.elements) {
-                    result.add(callback.call(interpreter, List.of(item)));
+                    result.add(callback.call(interpreter, List.of(item), false));
                 }
 
                 return new LoxArray(interpreter, result);
@@ -172,12 +172,12 @@ public class LoxArray implements LoxIndexable {
             }
 
             @Override
-            public Object call(Interpreter interpreter, List<Object> arguments) {
+            public Object call(Interpreter interpreter, List<Object> arguments, boolean isNewCall) {
                 LoxFunction callback = (LoxFunction) arguments.getFirst();
                 List<Object> result = new ArrayList<>();
 
                 for (Object item : array.elements) {
-                    Object returnValue = callback.call(array.interpreter, List.of(item));
+                    Object returnValue = callback.call(array.interpreter, List.of(item), false);
                     if (returnValue != null && (boolean) returnValue) {
                         result.add(item);
                     }
@@ -194,13 +194,13 @@ public class LoxArray implements LoxIndexable {
             }
 
             @Override
-            public Object call(Interpreter interpreter, List<Object> arguments) {
+            public Object call(Interpreter interpreter, List<Object> arguments, boolean isNewCall) {
                 LoxFunction callback = (LoxFunction) arguments.getFirst();
                 Object accumulator = arguments.get(1);
 
                 for (Object item : array.elements) {
                     assert accumulator != null;
-                    accumulator = callback.call(array.interpreter, List.of(accumulator, item));
+                    accumulator = callback.call(array.interpreter, List.of(accumulator, item), false);
                 }
 
                 return accumulator;
