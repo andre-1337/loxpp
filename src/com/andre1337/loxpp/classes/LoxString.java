@@ -3,7 +3,10 @@ package com.andre1337.loxpp.classes;
 import com.andre1337.loxpp.interpreter.Interpreter;
 import com.andre1337.loxpp.lexer.Token;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 public class LoxString {
     public String value;
@@ -259,6 +262,21 @@ public class LoxString {
             }
         });
 
+        methods.put("replace", new LoxCallable() {
+            @Override
+            public int arity() {
+                return 2;
+            }
+
+            @Override
+            public Object call(Interpreter interpreter, List<Object> arguments, boolean isNewCall) {
+                String replacee = string.unpack_type(arguments.getFirst());
+                String replacer = string.unpack_type(arguments.get(1));
+
+                return string.value.replace(replacee, replacer);
+            }
+        });
+
         return methods;
     }
 
@@ -267,7 +285,7 @@ public class LoxString {
             return methods.get(name.lexeme);
         }
 
-        throw new RuntimeError(name, "RuntimeError", "No such method.", null);
+        throw new RuntimeError(name, "RuntimeError", "No such method '" + name.lexeme + "'.", null);
     }
 
     @Override

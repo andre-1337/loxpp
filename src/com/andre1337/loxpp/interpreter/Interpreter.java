@@ -12,9 +12,13 @@ import com.andre1337.loxpp.sema.Resolver;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.nio.channels.AsynchronousServerSocketChannel;
 import java.nio.channels.AsynchronousSocketChannel;
+import java.nio.channels.FileChannel;
 import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -145,6 +149,105 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
         } catch (Exception e) {
           return null;
         }
+      }
+    });
+
+    globals.define("render_template", new LoxCallable() {
+      @Override
+      public int arity() {
+        return 2; // 1: html, 2: a map/dictionary
+      }
+
+      @Override
+      public Object call(Interpreter interpreter, List<Object> arguments, boolean isNewCall) {
+        Object htmlArg = arguments.getFirst();
+        String html = (htmlArg instanceof LoxString loxStr) ? loxStr.value : htmlArg.toString();
+
+        Object dictArg = arguments.get(1);
+
+        if (dictArg instanceof Map<?, ?> data) {
+          for (Map.Entry<?, ?> entry : data.entrySet()) {
+            String key = entry.getKey() instanceof LoxString ? ((LoxString) entry.getKey()).value : entry.getKey().toString();
+
+            key = key.replace("\"", "");
+
+            String value;
+            Object valObj = entry.getValue();
+
+            if (valObj instanceof LoxString loxStr) {
+              value = loxStr.value;
+            } else if (valObj instanceof String str) {
+              value = str;
+            } else if (valObj != null) {
+              value = valObj.toString();
+              if (value.endsWith(".0")) value = value.substring(0, value.length() - 2);
+            } else {
+              value = "null";
+            }
+
+            // replace {{ }} tags with the actual value
+            html = html.replace("{{ " + key + " }}", value).replace("{{" + key + "}}", value);
+          }
+        }
+
+        return new LoxString(html);
+      }
+    });
+
+    globals.define("file_size", new LoxCallable() {
+      @Override
+      public int arity() {
+        return 1;
+      }
+
+      @Override
+      public Object call(Interpreter interpreter, List<Object> arguments, boolean isNewCall) {
+        String path = arguments.getFirst().toString().replace("\"", "");
+
+        try {
+          long size = Files.size(Path.of(path));
+          return new LoxString(String.valueOf(size));
+        } catch (Exception e) {
+          return new LoxString("-1");
+        }
+      }
+    });
+
+    globals.define("stream_to_socket", new LoxCallable() {
+      @Override
+      public int arity() {
+        return 3;
+      }
+
+      @Override
+      public Object call(Interpreter interpreter, List<Object> arguments, boolean isNewCall) {
+        Object socketObj = arguments.getFirst();
+        String path = arguments.get(1).toString().replace("\"", "");
+        int chunkSize = ((Double) arguments.get(2)).intValue();
+
+        return CompletableFuture.supplyAsync(() -> {
+          try {
+            AsynchronousSocketChannel channel = (AsynchronousSocketChannel) socketObj;
+
+            try (FileChannel fileChannel = FileChannel.open(Path.of(path), StandardOpenOption.READ)) {
+              ByteBuffer buffer = ByteBuffer.allocate(chunkSize);
+
+              while (fileChannel.read(buffer) > 0) {
+                buffer.flip();
+
+                while (buffer.hasRemaining()) {
+                  channel.write(buffer).get();
+                }
+
+                buffer.clear();
+              }
+            }
+
+            return null;
+          } catch (Exception e) {
+            return null;
+          }
+        });
       }
     });
   }
@@ -754,6 +857,19 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
     List<Object> arguments = new ArrayList<>();
     for (Expr argument : expr.constructor.arguments) {
       arguments.add(evaluate(argument));
+    }
+
+    LoxFunction init = klass.findMethod("init");
+    if (init != null) {
+      int providedArgs = arguments.size();
+      int expectedArgs = init.declaration().params.size();
+
+      for (int i = providedArgs; i < expectedArgs; i++) {
+        Expr defaultExpr = init.declaration().params.get(i).defaultValue;
+
+        if (defaultExpr != null) arguments.add(evaluate(defaultExpr));
+        else throw new RuntimeError(expr.keyword, "RuntimeError", "Expected " + expectedArgs + ", but got " + providedArgs + " instead.", null);
+      }
     }
 
     return klass.call(this, arguments, true);

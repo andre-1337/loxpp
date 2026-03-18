@@ -718,7 +718,7 @@ impl Result {
 }
 
 class Request {
-    fn init(method, path, headers, body, query, json, params) {
+    fn init(method, path, headers, body, query, json, params, form, cookies) {
         self.method = method;
         self.path = path;
         self.headers = headers;
@@ -726,6 +726,8 @@ class Request {
         self.query = query;
         self.json = json;
         self.params = params;
+        self.form = form;
+        self.cookies = cookies;
     }
 }
 
@@ -816,6 +818,33 @@ class Response {
         await self.set_header("Content-Type: ${mime_type}");
         await self.send(content);
     }
+
+    fn async render(file_path, data) {
+        let content = read_file(file_path);
+
+        if content == null {
+            await self.set_header("Content-Type: text/plain; charset=utf-8");
+            self.is_sent = true;
+            await self.send("404: Template not found on disk");
+            return null;
+        }
+
+        let final_html = render_template(content, data);
+
+        await self.set_header("Content-Type: text/html; charset=utf-8");
+        self.is_sent = true;
+        await self.send(final_html);
+    }
+
+    fn async set_cookie(key, value) {
+        let header_string = "Set-Cookie: ${key}=${value}; Path=/; HttpOnly";
+        await self.set_header(header_string);
+    }
+
+    fn async stream_file(file_path, chunk_size = 65536) {
+        let file_stream = new Streams(chunk_size);
+        await file_stream.pipe(file_path, self);
+    }
 }
 
 class Server {
@@ -837,27 +866,42 @@ class Server {
     }
 
     private fn async parse_request(raw_http_string) {
-        if raw_http_string == null return new Request("GET", "/", [], "", null, {});
+        if raw_http_string == null return new Request("GET", "/", [], "", null, {}, {}, {});
 
         let http_parts = raw_http_string.split("\r\n\r\n");
         let head_section = http_parts[0];
 
         let body = "";
         let json_data = null;
+        let form_data = {};
+        let cookies_dict = {};
 
         if http_parts.len() > 1 {
             body = http_parts[1];
 
-            if body.len() > 0 && body.starts_with("{") {
-                json_data = parse_json(body);
+            if body.len() > 0 {
+                if body.starts_with("{") {
+                    json_data = parse_json(json);
+                } else if body.contains("=") {
+                    let pairs = body.split("&");
+                    for pair in pairs {
+                        let kv = pair.split("=");
+                        if kv.len() == 2 {
+                            let key = kv[0];
+                            let value = kv[1];
+                            value = value.replace("+", " ");
+                            form_data[key] = value;
+                        }
+                    }
+                }
             }
         }
 
         let lines = head_section.split("\r\n");
-        if lines.len() == 0 return new Request("GET", "/", [], body, null, {});
+        if lines.len() == 0 return new Request("GET", "/", [], body, null, {}, form_data, {});
 
         let request_line = lines[0].split(" ");
-        if request_line.len() < 2 return new Request("GET", "/", [], body, null, {});
+        if request_line.len() < 2 return new Request("GET", "/", [], body, null, {}, form_data, {});
 
         let method = request_line[0];
         let full_path = request_line[1];
@@ -885,7 +929,21 @@ class Server {
             }
         }
 
-        return new Request(method, path, [], body, query_dict, json_data, {});
+        for line in lines {
+            if line.starts_with("Cookie: ") {
+                let cookie_string = line.substring(8, line.len());
+                let cookie_pairs = cookie_string.split("; ");
+
+                for pair in cookie_pairs {
+                    let kv = pair.split("=");
+                    if kv.len() == 2 {
+                        cookies_dict[kv[0]] = kv[1];
+                    }
+                }
+            }
+        }
+
+        return new Request(method, path, [], body, query_dict, json_data, {}, form_data, cookies_dict);
     }
 
     private fn async handle_connection(client) {
@@ -963,5 +1021,40 @@ class Server {
                 await self.handle_connection(client);
             }
         }
+    }
+}
+
+class Streams {
+    fn init(chunk_size = 65536) {
+        self.chunk_size = chunk_size;
+    }
+
+    fn async pipe(file_path, response) {
+        let size_str = file_size(file_path);
+
+        if size_str == "-1" {
+            await response.set_header("Content-Type: text/plain; charset=utf-8");
+            response.is_sent = true;
+            await response.send("404: File not found on disk");
+            return null;
+        }
+
+        let mime_type = "application/octet-stream";
+
+        if file_path.ends_with(".html") mime_type = "text/html; charset=utf-8";
+        else if file_path.ends_with(".css") mime_type = "text/css; charset=utf-8";
+        else if file_path.ends_with(".js") mime_type = "application/javascript; charset=utf-8";
+        else if file_path.ends_with(".mp4") mime_type = "video/mp4";
+        else if file_path.ends_with(".png") mime_type = "image/png";
+
+        let headers = "HTTP/1.1 200 OK\r\n";
+        headers = headers + "Content-Type: ${mime_type}\r\n";
+        headers = headers + "Content-Length: ${size_str}\r\n";
+        headers = headers + "Accept-Ranges: bytes\r\n";
+        headers = headers + "Connection: close\r\n\r\n";
+
+        await ___tcp_write___(response.socket, headers);
+        await stream_to_socket(response.socket, file_path, self.chunk_size);
+        response.is_sent = true;
     }
 }

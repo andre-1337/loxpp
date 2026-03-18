@@ -770,16 +770,7 @@ public class Parser {
   }
 
   private Expr unary() {
-    if (match(NEW)) {
-      Token keyword = previous();
-      Expr constructor = call();
-
-      if (!(constructor instanceof Expr.Call)) {
-        throw error(keyword, "Expect '(' after class name.");
-      }
-
-      return new Expr.New(keyword, (Expr.Call) constructor);
-    } else if (match(BANG, MINUS, PLUS_PLUS, MINUS_MINUS)) {
+    if (match(BANG, MINUS, PLUS_PLUS, MINUS_MINUS)) {
       Token operator = previous();
       Expr right = unary();
       return new Expr.Unary(operator, right);
@@ -911,6 +902,29 @@ public class Parser {
     if (match(AWAIT)) {
       Expr value = expression();
       return new Expr.Await(previous(), value);
+    }
+
+    if (match(NEW)) {
+      Token keyword = previous();
+      Expr callee = primary();
+
+      while (match(DOT)) {
+        Token name = consume(IDENTIFIER, "Expect property name after '.'.");
+        callee = new Expr.Get(callee, name);
+      }
+
+      consume(LEFT_PAREN, "Expect '(' after class name.");
+      List<Expr> arguments = new ArrayList<>();
+      if (!check(RIGHT_PAREN)) {
+        do {
+          arguments.add(expression());
+        } while (match(COMMA));
+      }
+      Token paren = consume(RIGHT_PAREN, "Expect ')' after arguments.");
+
+      Expr.Call constructorCall = new Expr.Call(callee, paren, arguments, null);
+
+      return new Expr.New(keyword, constructorCall);
     }
 
     throw error(peek(), "Expect expression.");
