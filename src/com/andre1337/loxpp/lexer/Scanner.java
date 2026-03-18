@@ -49,7 +49,6 @@ public class Scanner {
     keywords.put("private", PRIVATE);
     keywords.put("export", EXPORT);
     keywords.put("new", NEW);
-    keywords.put("field", FIELD);
   }
 
   private final String source;

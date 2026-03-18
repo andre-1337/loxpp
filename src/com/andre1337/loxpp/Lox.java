@@ -26,8 +26,7 @@ public class Lox {
   public static final Map<String, LoxModule> loadedModules = new HashMap<>();
 
   private static void checkFileExtension(String path) {
-    if (path.endsWith(".lox") || path.endsWith(".loxlib") || path.endsWith(".loxtest")) {
-    } else {
+    if (!path.endsWith(".lox") && !path.endsWith(".loxlib")) {
       throw new RuntimeError(new Token(TokenType.EOF, "", null, 0, 0), "RuntimeError", "The provided file extension is not supported by Lox++.", "Please consider changing it to '.lox' if you're writing a program or '.loxlib' if you're writing a library.");
     }
   }
@@ -100,10 +99,11 @@ public class Lox {
     List<Stmt> statements = getStmts(source);
     if (hadError) return;
 
-    //Optimizer optimizer = new Optimizer();
-    //List<Stmt> optimized = optimizer.optimize(statements);
-
-    //if (hadError) return;
+    /*
+    Optimizer optimizer = new Optimizer();
+    List<Stmt> optimized = optimizer.optimize(statements);
+    if (hadError) return;
+    */
 
     Resolver resolver = new Resolver(interpreter);
     resolver.resolve(statements);

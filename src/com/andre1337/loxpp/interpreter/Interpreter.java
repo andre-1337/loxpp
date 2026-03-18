@@ -91,7 +91,7 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
     globals.define("___tcp_write___", new LoxCallable() {
       @Override public int arity() { return 2; }
       @Override public Object call(Interpreter interpreter, List<Object> args, boolean isNew) {
-        return LoxTcpCore.___tcp_write___((AsynchronousSocketChannel)args.getFirst(), (LoxString) args.get(1));
+        return LoxTcpCore.___tcp_write___((AsynchronousSocketChannel)args.getFirst(), args.get(1));
       }
     });
 
@@ -378,8 +378,8 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
     }
 
     for (int i = 0; i < traitDef.declaration().params.size(); i++) {
-      String traitDefParamName = traitDef.declaration().params.get(i).name.lexeme;
-      String classImplParamName = classImpl.declaration().params.get(i).name.lexeme;
+      String traitDefParamName = traitDef.declaration().params.get(i).name().lexeme;
+      String classImplParamName = classImpl.declaration().params.get(i).name().lexeme;
 
       if (!traitDefParamName.equals(classImplParamName)) {
         throw new RuntimeError(
@@ -635,7 +635,7 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
         LoxFunction hasNext = klass.findMethod("has_next").bind(instance);
         LoxFunction next = klass.findMethod("next").bind(instance);
 
-        while ((boolean) hasNext.call(this, List.of(), false)) {
+        while ((boolean) Objects.requireNonNull(hasNext.call(this, List.of(), false))) {
           Object currentValue = next.call(this, Collections.emptyList(), false);
           environment.define(stmt.key.lexeme, currentValue);
 
@@ -865,7 +865,7 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
       int expectedArgs = init.declaration().params.size();
 
       for (int i = providedArgs; i < expectedArgs; i++) {
-        Expr defaultExpr = init.declaration().params.get(i).defaultValue;
+        Expr defaultExpr = init.declaration().params.get(i).defaultValue();
 
         if (defaultExpr != null) arguments.add(evaluate(defaultExpr));
         else throw new RuntimeError(expr.keyword, "RuntimeError", "Expected " + expectedArgs + ", but got " + providedArgs + " instead.", null);
@@ -899,10 +899,10 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
       for (Expr.MatchCase kase : expr.cases) {
         environment = new Environment(originalEnv);
 
-        if (matchPattern(value, kase.pattern, environment)) {
-          if (kase.guard == null || isTruthy(evaluate(kase.guard))) {
+        if (matchPattern(value, kase.pattern(), environment)) {
+          if (kase.guard() == null || isTruthy(evaluate(kase.guard()))) {
             try {
-              executeBlock(kase.body, environment);
+              executeBlock(kase.body(), environment);
             } catch (Return returnValue) {
               return returnValue.value;
             }
@@ -1391,8 +1391,8 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
     for (int i = filledArgs.size(); i < declaration.params.size(); i++) {
       Stmt.Function.Param param = declaration.params.get(i);
 
-      if (param.defaultValue != null) {
-        filledArgs.add(evaluate(param.defaultValue));
+      if (param.defaultValue() != null) {
+        filledArgs.add(evaluate(param.defaultValue()));
       } else {
         throw new RuntimeError(
                 paren,

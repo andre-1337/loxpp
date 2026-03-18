@@ -46,6 +46,7 @@ public class LoxClass extends LoxInstance implements LoxCallable {
     return null;
   }
 
+  @SuppressWarnings("BooleanMethodIsAlwaysInverted")
   public boolean hasTrait(LoxTrait trait) {
     return traits.containsKey(trait.name().lexeme) || (superclass != null && superclass.traits.containsKey(trait.name().lexeme));
   }

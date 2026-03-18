@@ -77,7 +77,8 @@ public class LoxTcpCore {
             return future;
         }
 
-        ByteBuffer buffer = ByteBuffer.wrap(dataObj.toString().getBytes(StandardCharsets.UTF_8));
+        String data = dataObj instanceof LoxString loxStr ? loxStr.value : dataObj.toString();
+        ByteBuffer buffer = ByteBuffer.wrap(data.getBytes(StandardCharsets.UTF_8));
 
         socket.write(buffer, null, new java.nio.channels.CompletionHandler<Integer, Void>() {
             @Override

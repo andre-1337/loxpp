@@ -2,7 +2,6 @@ package com.andre1337.loxpp.classes;
 
 import com.andre1337.loxpp.lexer.Token;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -40,24 +39,12 @@ public class LoxUnionInstance {
         };
     }
 
-    public List<String> getFieldNames() {
-        return new ArrayList<>(fields.keySet());
-    }
-
     public String getFieldName(int idx) {
         if (idx < 0 || idx >= parameters.size()) {
             throw new IndexOutOfBoundsException("Invalid field index.");
         }
 
         return parameters.get(idx).lexeme;
-    }
-
-    public Object getField(String name) {
-        return fields.get(name);
-    }
-
-    public boolean isCase(String expectedCase) {
-        return caseName.equals(expectedCase);
     }
 
     @Override

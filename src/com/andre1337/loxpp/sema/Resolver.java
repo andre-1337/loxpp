@@ -33,7 +33,7 @@ public class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
   }
 
   private ClassType currentClass = ClassType.NONE;
-  private Map<String, Set<String>> privateMethods = new HashMap<>();
+  private final Map<String, Set<String>> privateMethods = new HashMap<>();
 
   public void resolve(List<Stmt> statements) {
     for (Stmt statement : statements) {
@@ -397,13 +397,13 @@ public class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
 
     for (Expr.MatchCase kase : expr.cases) {
       beginScope();
-      resolve(kase.pattern);
+      resolve(kase.pattern());
 
-      if (kase.guard != null) {
-        resolve(kase.guard);
+      if (kase.guard() != null) {
+        resolve(kase.guard());
       }
 
-      resolve(kase.body);
+      resolve(kase.body());
       endScope();
     }
 
@@ -509,11 +509,11 @@ public class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
     beginScope();
 
     for (Stmt.Function.Param param : expr.params) {
-      declare(param.name);
-      define(param.name);
+      declare(param.name());
+      define(param.name());
 
-      if (param.defaultValue != null) {
-        resolve(param.defaultValue);
+      if (param.defaultValue() != null) {
+        resolve(param.defaultValue());
       }
     }
 
@@ -680,11 +680,11 @@ public class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
     beginScope();
     if (function.params != null) {
       for (Stmt.Function.Param param : function.params) {
-        declare(param.name);
-        define(param.name);
+        declare(param.name());
+        define(param.name());
 
-        if (param.defaultValue != null) {
-          resolve(param.defaultValue);
+        if (param.defaultValue() != null) {
+          resolve(param.defaultValue());
         }
       }
     }

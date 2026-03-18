@@ -1097,6 +1097,7 @@ public class Parser {
     return peek().type == type;
   }
 
+  @SuppressWarnings("SameParameterValue")
   private boolean checkNext(TokenType type) {
     if (isAtEnd()) return false;
     if (tokens.get(current + 1).type == EOF) return false;

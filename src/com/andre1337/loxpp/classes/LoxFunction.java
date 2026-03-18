@@ -37,7 +37,7 @@ public record LoxFunction(Stmt.Function declaration, Environment closure, boolea
     Environment environment = new Environment(closure);
 
     for (int i = 0; i < declaration.params.size(); i++) {
-      environment.define(declaration.params.get(i).name.lexeme, arguments.get(i));
+      environment.define(declaration.params.get(i).name().lexeme, arguments.get(i));
     }
 
     if (isAsync) {

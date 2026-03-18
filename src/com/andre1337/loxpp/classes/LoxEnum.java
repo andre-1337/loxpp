@@ -37,10 +37,6 @@ public class LoxEnum {
         return methods.get(name);
     }
 
-    public boolean hasMethod(String name) {
-        return methods.containsKey(name);
-    }
-
     @Override
     public String toString() {
         return "<enum " + name + ">";

@@ -21,8 +21,7 @@ public class LoxJsonStringifier {
         if (obj instanceof String) return "\"" + escapeString((String) obj) + "\"";
         if (obj instanceof LoxString) return "\"" + escapeString(((LoxString) obj).value) + "\"";
 
-        if (obj instanceof List) {
-            List<?> list = (List<?>) obj;
+        if (obj instanceof List<?> list) {
             StringBuilder sb = new StringBuilder();
             sb.append("[");
 
@@ -35,8 +34,7 @@ public class LoxJsonStringifier {
             return sb.toString();
         }
 
-        if (obj instanceof Map) {
-            Map<?, ?> map = (Map<?, ?>) obj;
+        if (obj instanceof Map<?, ?> map) {
             StringBuilder sb = new StringBuilder();
             sb.append("{");
 

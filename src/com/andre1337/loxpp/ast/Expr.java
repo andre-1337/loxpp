@@ -1,10 +1,9 @@
 package com.andre1337.loxpp.ast;
 
-import com.andre1337.loxpp.classes.LoxClass;
-import com.andre1337.loxpp.classes.LoxFunction;
 import com.andre1337.loxpp.lexer.Token;
 
-import java.util.*;
+import java.util.List;
+import java.util.Map;
 
 public abstract class Expr {
   public interface Visitor<R> {
@@ -131,9 +130,6 @@ public abstract class Expr {
 
     public final Expr object;
     public final Token name;
-
-    public LoxClass cachedClass = null;
-    public LoxFunction cachedMethod = null;
   }
 
   public static class Grouping extends Expr {
@@ -417,17 +413,7 @@ public abstract class Expr {
     public final List<MatchCase> cases;
   }
 
-  public static class MatchCase {
-    public MatchCase(Expr pattern, Expr guard, List<Stmt> body) {
-      this.pattern = pattern;
-      this.guard = guard;
-      this.body = body;
-    }
-
-    public final Expr pattern;
-    public final Expr guard;
-    public final List<Stmt> body;
-  }
+  public record MatchCase(Expr pattern, Expr guard, List<Stmt> body) {}
 
   public static class WildcardPattern extends Expr {
     public WildcardPattern(Token token) {

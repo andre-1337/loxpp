@@ -299,11 +299,10 @@ public class LoxString {
             return false;
         }
 
-        if (!(other instanceof LoxString)) {
+        if (!(other instanceof LoxString obj)) {
             return false;
         }
 
-        LoxString obj = (LoxString) other;
         return this.value.equals(obj.value);
     }
 }

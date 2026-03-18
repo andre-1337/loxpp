@@ -33,14 +33,6 @@ public class LoxNamespace {
         throw new RuntimeError(name, "RuntimeError", "Undefined member '" + name.lexeme + "'.", null);
     }
 
-    /*public Object get(Token obj) {
-        if (members.containsKey(obj.lexeme)) {
-            return members.get(obj.lexeme);
-        }
-
-        throw new RuntimeError(obj, "RuntimeError", "Undefined member '" + obj.lexeme + "' in namespace '" + name + "'.", null);
-    }*/
-
     @Override
     public String toString() {
         return "<namespace " + name + ">";

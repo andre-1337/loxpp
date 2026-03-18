@@ -104,15 +104,7 @@ public abstract class Stmt {
   }
 
   public static class Function extends Stmt {
-    public static class Param {
-      public final Token name;
-      public final Expr defaultValue;
-
-      public Param(Token name, Expr defaultValue) {
-        this.name = name;
-        this.defaultValue = defaultValue;
-      }
-    }
+    public record Param(Token name, Expr defaultValue) {}
 
     public Function(Token name, List<Param> params, List<Stmt> body, boolean isAbstract, boolean isAsync, boolean isPrivate) {
       this.name = name;
