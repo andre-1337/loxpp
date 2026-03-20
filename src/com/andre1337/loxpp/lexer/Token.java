@@ -3,7 +3,7 @@ package com.andre1337.loxpp.lexer;
 public class Token {
   public final TokenType type;
   public final String lexeme;
-  public final Object literal;
+  public Object literal;
   public int line;
   public int column;
 

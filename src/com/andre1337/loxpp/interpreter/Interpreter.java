@@ -12,15 +12,15 @@ import com.andre1337.loxpp.sema.Resolver;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.ByteBuffer;
+import java.net.http.HttpClient;
 import java.nio.channels.AsynchronousServerSocketChannel;
-import java.nio.channels.AsynchronousSocketChannel;
-import java.nio.channels.FileChannel;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardOpenOption;
+import java.security.MessageDigest;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 
 public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
@@ -66,10 +66,26 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
       }
     });
 
+    globals.define("___tcp_bind_s___", new LoxCallable() {
+      @Override
+      public int arity() {
+        return 3; // 1: port, 2: key store path, 3: key store pass
+      }
+
+      @Override
+      public Object call(Interpreter interpreter, List<Object> arguments, boolean isNewCall) {
+        int port = (int)(double) arguments.getFirst();
+        String keyStorePath = (arguments.get(1) instanceof LoxString loxStr) ? loxStr.value : arguments.get(1).toString();
+        String keyStorePass = (arguments.get(2) instanceof LoxString loxStr) ? loxStr.value : arguments.get(2).toString();
+
+        return LoxTcpCore.___tcp_bind_s___(port, keyStorePath, keyStorePass);
+      }
+    });
+
     globals.define("___tcp_accept___", new LoxCallable() {
       @Override public int arity() { return 1; }
       @Override public Object call(Interpreter interpreter, List<Object> args, boolean isNew) {
-        return LoxTcpCore.___tcp_accept___((AsynchronousServerSocketChannel)args.getFirst());
+        return LoxTcpCore.___tcp_accept___(args.getFirst());
       }
     });
 
@@ -82,23 +98,27 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
 
     // TCP CLIENT
     globals.define("___tcp_read___", new LoxCallable() {
-      @Override public int arity() { return 2; }
+      @Override public int arity() {
+        return 2; // 1: socket channel, 2: buffer size
+      }
       @Override public Object call(Interpreter interpreter, List<Object> args, boolean isNew) {
-        return LoxTcpCore.___tcp_read___((AsynchronousSocketChannel)args.getFirst(), (int)(double)args.get(1));
+        return LoxTcpCore.___tcp_read___(args.getFirst(), args.get(1));
       }
     });
 
     globals.define("___tcp_write___", new LoxCallable() {
-      @Override public int arity() { return 2; }
+      @Override public int arity() {
+        return 2; // 1: socket channel, 2: data object
+      }
       @Override public Object call(Interpreter interpreter, List<Object> args, boolean isNew) {
-        return LoxTcpCore.___tcp_write___((AsynchronousSocketChannel)args.getFirst(), args.get(1));
+        return LoxTcpCore.___tcp_write___(args.getFirst(), args.get(1));
       }
     });
 
     globals.define("___tcp_close___", new LoxCallable() {
       @Override public int arity() { return 1; }
       @Override public Object call(Interpreter interpreter, List<Object> args, boolean isNew) {
-        return LoxTcpCore.___tcp_close___((AsynchronousSocketChannel)args.getFirst());
+        return LoxTcpCore.___tcp_close___(args.getFirst());
       }
     });
 
@@ -141,10 +161,11 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
       public Object call(Interpreter interpreter, List<Object> arguments, boolean isNewCall) {
         Object arg = arguments.getFirst();
         String filePath = (arg instanceof LoxString loxStr) ? loxStr.value : arg.toString();
-        filePath = filePath.replace("\"", "");
+        filePath = filePath.replace("\"", "").trim();
 
         try {
-          String content = java.nio.file.Files.readString(java.nio.file.Path.of(filePath));
+          byte[] bytes = Files.readAllBytes(Path.of(filePath));
+          String content = new String(bytes, StandardCharsets.ISO_8859_1);
           return new LoxString(content);
         } catch (Exception e) {
           return null;
@@ -213,39 +234,214 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
       }
     });
 
-    globals.define("stream_to_socket", new LoxCallable() {
+    globals.define("write_file", new LoxCallable() {
       @Override
       public int arity() {
-        return 3;
+        return 2; // 1: path, 2: content
       }
 
       @Override
       public Object call(Interpreter interpreter, List<Object> arguments, boolean isNewCall) {
-        Object socketObj = arguments.getFirst();
-        String path = arguments.get(1).toString().replace("\"", "");
-        int chunkSize = ((Double) arguments.get(2)).intValue();
+        Object pathArg = arguments.getFirst();
+        String filePath = (pathArg instanceof LoxString loxStr) ? loxStr.value : pathArg.toString();
+        filePath = filePath.replace("\"", "").trim();
 
-        return CompletableFuture.supplyAsync(() -> {
+        Object contentArg = arguments.get(1);
+        String content = (contentArg instanceof LoxString loxStr) ? loxStr.value : contentArg.toString();
+
+        try {
+          Files.writeString(Path.of(filePath), content, StandardCharsets.ISO_8859_1);
+          return true;
+        } catch (Exception e) {
+          System.err.println("Error while reading file: " + e.getMessage());
+          return false;
+        }
+      }
+    });
+
+    globals.define("___fetch___", new LoxCallable() {
+      // reduces load times by having a shared client
+      // first hit takes longer, since it is "warming up"
+      // all the other hits are way faster
+      private final HttpClient sharedClient = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NORMAL).build();
+
+      @Override
+      public int arity() {
+        return 2; // 1: url, 2: method
+      }
+
+      @Override
+      public Object call(Interpreter interpreter, List<Object> arguments, boolean isNewCall) {
+        String url = arguments.get(0).toString().replace("\"", "").trim();
+        String method = arguments.get(1).toString().replace("\"", "").toUpperCase().trim();
+
+        return java.util.concurrent.CompletableFuture.supplyAsync(() -> {
           try {
-            AsynchronousSocketChannel channel = (AsynchronousSocketChannel) socketObj;
+            java.net.http.HttpRequest request = java.net.http.HttpRequest.newBuilder()
+                    .uri(java.net.URI.create(url))
+                    .header("User-Agent", "lox-std-http/1.0")
+                    .header("Accept", "application/json")
+                    .method(method, java.net.http.HttpRequest.BodyPublishers.noBody())
+                    .build();
 
-            try (FileChannel fileChannel = FileChannel.open(Path.of(path), StandardOpenOption.READ)) {
-              ByteBuffer buffer = ByteBuffer.allocate(chunkSize);
+            java.net.http.HttpResponse<String> response = sharedClient.send(
+                    request,
+                    java.net.http.HttpResponse.BodyHandlers.ofString()
+            );
 
-              while (fileChannel.read(buffer) > 0) {
-                buffer.flip();
+            List<Object> result = new java.util.ArrayList<>();
+            result.add((double) response.statusCode());
+            result.add(response.body());
 
-                while (buffer.hasRemaining()) {
-                  channel.write(buffer).get();
+            return new LoxArray(interpreter, result);
+
+          } catch (Exception e) {
+            System.err.println("Native Fetch Error: " + e.getMessage());
+
+            List<Object> result = new java.util.ArrayList<>();
+            result.add(0.0);
+            result.add(e.getMessage());
+            return new LoxArray(interpreter, result);
+          }
+        });
+      }
+    });
+
+    globals.define("___ws_handshake___", new LoxCallable() {
+      @Override
+      public int arity() {
+        return 1;
+      }
+
+      @Override
+      public Object call(Interpreter interpreter, List<Object> arguments, boolean isNewCall) {
+        try {
+          String clientKey = (arguments.getFirst() instanceof LoxString loxStr) ? loxStr.value.trim() : arguments.getFirst().toString().trim();
+          String magicKey = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
+          MessageDigest md = MessageDigest.getInstance("SHA-1");
+          byte[] hashed = md.digest((clientKey + magicKey).getBytes(StandardCharsets.UTF_8));
+
+          return Base64.getEncoder().encodeToString(hashed);
+        } catch (Exception e) {
+          return null;
+        }
+      }
+    });
+
+    globals.define("___ws_encode___", new LoxCallable() {
+      @Override
+      public int arity() { return 1; }
+
+      @Override
+      public Object call(Interpreter interpreter, List<Object> arguments, boolean isNewCall) {
+        String message = arguments.getFirst().toString();
+        byte[] msgBytes = message.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
+
+        baos.write(129);
+
+        if (msgBytes.length <= 125) {
+          baos.write(msgBytes.length);
+        } else if (msgBytes.length <= 65535) {
+          baos.write(126);
+          baos.write((msgBytes.length >> 8) & 255);
+          baos.write(msgBytes.length & 255);
+        }
+
+        try {
+          baos.write(msgBytes);
+        } catch(Exception ignored) {}
+
+        return new LoxString(baos.toString(StandardCharsets.ISO_8859_1));
+      }
+    });
+
+    globals.define("___ws_decode___", new LoxCallable() {
+      @Override
+      public int arity() { return 1; }
+
+      @Override
+      public Object call(Interpreter interpreter, List<Object> arguments, boolean isNewCall) {
+        try {
+          if (arguments.getFirst() == null) return null;
+
+          Object arg = arguments.getFirst();
+          String rawStr = arg.toString();
+          try {
+            java.lang.reflect.Field valueField = arg.getClass().getField("value");
+            rawStr = (String) valueField.get(arg);
+          } catch (Exception ignored) {}
+
+          byte[] raw = rawStr.getBytes(java.nio.charset.StandardCharsets.ISO_8859_1);
+          if (raw.length < 2) return null;
+
+          int opcode = raw[0] & 0x0F;
+          if (opcode == 8) return "DISCONNECT_SIGNAL";
+
+          boolean masked = (raw[1] & 0x80) != 0;
+          int payloadLength = raw[1] & 0x7F;
+          int offset = 2;
+
+          if (payloadLength == 126) { offset += 2; }
+          else if (payloadLength == 127) { offset += 8; }
+
+          byte[] masks = new byte[4];
+          if (masked) {
+            System.arraycopy(raw, offset, masks, 0, 4);
+            offset += 4;
+          }
+
+          int actualLen = raw.length - offset;
+          if (actualLen <= 0) return "";
+
+          byte[] decoded = new byte[actualLen];
+          for (int i = 0; i < actualLen; i++) {
+            decoded[i] = (byte) (raw[offset + i] ^ (masked ? masks[i % 4] : 0));
+          }
+
+          return new LoxString(new String(decoded, java.nio.charset.StandardCharsets.UTF_8));
+        } catch (Exception e) {
+          return null;
+        }
+      }
+    });
+
+    globals.define("stream_to_socket", new LoxCallable() {
+      @Override
+      public int arity() {
+        return 3; // 1: socket, 2: file path, 3: chunk size
+      }
+
+      @Override
+      public Object call(Interpreter interpreter, List<Object> arguments, boolean isNewCall) {
+        Object socket = arguments.get(0);
+        String filePath = arguments.get(1).toString().replace("\"", "").trim();
+        int chunkSize = (int)(double) arguments.get(2);
+
+        return java.util.concurrent.CompletableFuture.supplyAsync(() -> {
+          try (java.io.InputStream is = java.nio.file.Files.newInputStream(java.nio.file.Path.of(filePath))) {
+            byte[] buffer = new byte[chunkSize];
+            int bytesRead;
+
+            if (socket instanceof javax.net.ssl.SSLSocket sslSocket) {
+              java.io.OutputStream os = sslSocket.getOutputStream();
+              while ((bytesRead = is.read(buffer)) != -1) {
+                os.write(buffer, 0, bytesRead);
+              }
+              os.flush();
+            } else {
+              java.nio.channels.AsynchronousSocketChannel nioSocket = (java.nio.channels.AsynchronousSocketChannel) socket;
+              while ((bytesRead = is.read(buffer)) != -1) {
+                java.nio.ByteBuffer bb = java.nio.ByteBuffer.wrap(buffer, 0, bytesRead);
+                while (bb.hasRemaining()) {
+                  nioSocket.write(bb).get();
                 }
-
-                buffer.clear();
               }
             }
-
-            return null;
+            return true;
           } catch (Exception e) {
-            return null;
+            System.out.println("Java Stream Error: " + e.getMessage());
+            return false;
           }
         });
       }
@@ -885,8 +1081,18 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
 
     try {
       return promise.get();
-    } catch (InterruptedException | ExecutionException e) {
-      throw new RuntimeError(expr.keyword, "RuntimeError", "Failed to await promise: " + e.getMessage(), null);
+    } catch (CompletionException | ExecutionException | InterruptedException e) {
+      Throwable cause = e.getCause();
+
+      if (cause instanceof RuntimeError runtimeError) {
+        throw runtimeError;
+      }
+
+      if (cause instanceof Return ret) {
+        throw ret;
+      }
+
+      throw new RuntimeError(expr.keyword, "RuntimeError", "Failed to await promise.", cause != null ? cause.getMessage() : e.getMessage());
     }
   }
 
@@ -1171,8 +1377,21 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
     Object index = evaluate(expr.index);
 
     if (indexee instanceof Map<?, ?> dict) {
-      String keyStr = (index instanceof LoxString loxStr) ? loxStr.value : index.toString();
-      return dict.get(keyStr);
+      String searchKey = (index instanceof LoxString loxStr) ? loxStr.value : index.toString();
+      searchKey = searchKey.replace("\"", "");
+
+      for (Map.Entry<?, ?> entry : dict.entrySet()) {
+        Object mapKey = entry.getKey();
+
+        String currentKey = (mapKey instanceof LoxString lStr) ? lStr.value : mapKey.toString();
+        currentKey = currentKey.replace("\"", "");
+
+        if (searchKey.equals(currentKey)) {
+          return entry.getValue();
+        }
+      }
+
+      return null;
     }
 
     LoxTrait indexableTrait = (LoxTrait) environment.get("Indexable");
@@ -1509,13 +1728,6 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
     if (object instanceof String str) {
       return new LoxString(str).getMethod(expr.name);
     }
-
-    System.out.println(expr.name);
-    System.out.println(expr.object);
-
-    System.out.println(expr.name.lexeme);
-    System.out.println(expr.name.line);
-    System.out.println(expr.name.column);
 
     throw new RuntimeError(
             expr.name,

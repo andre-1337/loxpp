@@ -577,6 +577,7 @@ public class Parser {
         keyValues.put(spread, new Expr.Spread(spread, expr));
       } else {
         Token key = consume(STRING, "Expect dictionary key.");
+        key.literal = ((String) key.literal).replace("\"", "");
         consume(COLON, "Expect ':' after dictionary key.");
 
         Expr value = expression();

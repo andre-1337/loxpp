@@ -42,6 +42,10 @@ public class LoxJsonStringifier {
             for (Map.Entry<?, ?> entry : map.entrySet()) {
                 String key = entry.getKey() instanceof LoxString ? ((LoxString) entry.getKey()).value : entry.getKey().toString();
 
+                if (key.startsWith("\"") && key.endsWith("\"") && key.length() >= 2) {
+                    key = key.substring(1, key.length() - 1);
+                }
+
                 sb.append("\"").append(escapeString(key)).append("\":");
                 sb.append(stringify(entry.getValue()));
 

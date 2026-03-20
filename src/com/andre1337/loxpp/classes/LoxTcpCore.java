@@ -1,11 +1,19 @@
 package com.andre1337.loxpp.classes;
 
+import javax.net.ssl.KeyManagerFactory;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLServerSocketFactory;
+import javax.net.ssl.SSLSocket;
+import java.io.ByteArrayOutputStream;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.net.ServerSocket;
 import java.nio.ByteBuffer;
 import java.nio.channels.AsynchronousServerSocketChannel;
 import java.nio.channels.AsynchronousSocketChannel;
 import java.nio.charset.StandardCharsets;
+import java.security.KeyStore;
 import java.util.concurrent.CompletableFuture;
 
 public class LoxTcpCore {
@@ -21,10 +29,35 @@ public class LoxTcpCore {
         });
     }
 
-    public static CompletableFuture<AsynchronousSocketChannel> ___tcp_accept___(AsynchronousServerSocketChannel server) {
+    public static CompletableFuture<ServerSocket> ___tcp_bind_s___(int port, String keystorePath, String keystorePass) {
         return CompletableFuture.supplyAsync(() -> {
             try {
-                return server.accept().get();
+                KeyStore keyStore = KeyStore.getInstance("JKS");
+                keyStore.load(new FileInputStream(keystorePath), keystorePass.toCharArray());
+
+                KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance("SunX509");
+                keyManagerFactory.init(keyStore, keystorePass.toCharArray());
+
+                SSLContext sslContext = SSLContext.getInstance("TLS");
+                sslContext.init(keyManagerFactory.getKeyManagers(), null, null);
+
+                SSLServerSocketFactory socketFactory = sslContext.getServerSocketFactory();
+                return socketFactory.createServerSocket(port);
+            } catch (Exception e) {
+                System.err.println("FATAL SSL BIND ERROR: " + e.getMessage());
+                return null;
+            }
+        });
+    }
+
+    public static CompletableFuture<Object> ___tcp_accept___(Object serverArg) {
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                if (serverArg instanceof javax.net.ssl.SSLServerSocket sslServer) {
+                    return sslServer.accept();
+                }
+
+                return ((AsynchronousServerSocketChannel) serverArg).accept().get();
             } catch (Exception e) {
                 throw new RuntimeException("Error accepting connection", e);
             }
@@ -41,26 +74,99 @@ public class LoxTcpCore {
         });
     }
 
-    public static CompletableFuture<LoxString> ___tcp_read___(AsynchronousSocketChannel socket, int bufferSize) {
+    public static CompletableFuture<LoxString> ___tcp_read___(Object socket, Object bufferSize) {
+        int bSize = (int)(double) bufferSize;
+
+        if (socket instanceof javax.net.ssl.SSLSocket sslClient) {
+            return java.util.concurrent.CompletableFuture.supplyAsync(() -> {
+                try {
+                    java.io.InputStream is = sslClient.getInputStream();
+                    ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                    byte[] buffer = new byte[bSize];
+
+                    int bytesRead = is.read(buffer);
+                    if (bytesRead == -1) return null;
+
+                    baos.write(buffer, 0, bytesRead);
+                    String currentData = baos.toString(StandardCharsets.ISO_8859_1);
+
+                    // If there is a body, calculate the size and loop until we have it all!
+                    if (currentData.contains("\r\n\r\n") && currentData.contains("Content-Length: ")) {
+                        try {
+                            int lengthIndex = currentData.indexOf("Content-Length: ") + 16;
+                            int endOfLine = currentData.indexOf("\r\n", lengthIndex);
+                            int contentLength = Integer.parseInt(currentData.substring(lengthIndex, endOfLine).trim());
+
+                            int headerLength = currentData.indexOf("\r\n\r\n") + 4;
+                            int totalExpectedBytes = headerLength + contentLength;
+
+                            while (baos.size() < totalExpectedBytes) {
+                                bytesRead = is.read(buffer);
+                                if (bytesRead == -1) break;
+                                baos.write(buffer, 0, bytesRead);
+                            }
+                        } catch (Exception e) {
+                            System.out.println("JAVA SSL Error parsing Content-Length: " + e.getMessage());
+                        }
+                    }
+
+                    return new LoxString(baos.toString(StandardCharsets.ISO_8859_1));
+                } catch (Exception e) {
+                    return null;
+                }
+            });
+        }
+
         return CompletableFuture.supplyAsync(() -> {
             try {
-                if (socket == null) {
+                AsynchronousSocketChannel sckt = (AsynchronousSocketChannel) socket;
+
+                if (sckt == null) {
                     System.out.println("JAVA: socket is null.");
                     return null;
                 }
 
-                ByteBuffer buffer = ByteBuffer.allocate(bufferSize);
-                Integer bytesRead = socket.read(buffer).get();
+                ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                ByteBuffer buffer = ByteBuffer.allocate(bSize);
+                Integer bytesRead = sckt.read(buffer).get();
 
                 if (bytesRead == null || bytesRead == -1) {
                     return null;
                 }
 
                 buffer.flip();
-                byte[] data = new byte[bytesRead];
-                buffer.get(data);
+                byte[] firstChunk = new byte[bytesRead];
+                buffer.get(firstChunk);
+                baos.write(firstChunk);
 
-                return new LoxString(new String(data));
+                String currentData = new String(firstChunk, StandardCharsets.ISO_8859_1);
+
+                if (currentData.contains("\r\n\r\n") && currentData.contains("Content-Length: ")) {
+                    try {
+                        int lengthIndex = currentData.indexOf("Content-Length: ") + 16;
+                        int endOfLine = currentData.indexOf("\r\n", lengthIndex);
+                        int contentLength = Integer.parseInt(currentData.substring(lengthIndex, endOfLine).trim());
+
+                        int headerLength = currentData.indexOf("\r\n\r\n") + 4;
+                        int totalExpectedBytes = headerLength + contentLength;
+
+                        while (baos.size() < totalExpectedBytes) {
+                            buffer.clear();
+                            Integer nextBytesRead = sckt.read(buffer).get();
+
+                            if (nextBytesRead == null || nextBytesRead == -1) break;
+
+                            buffer.flip();
+                            byte[] nextChunk = new byte[nextBytesRead];
+                            buffer.get(nextChunk);
+                            baos.write(nextChunk);
+                        }
+                    } catch (Exception e) {
+                        System.out.println("JAVA: Error parsing Content-Length: " + e.getMessage());
+                    }
+                }
+
+                return new LoxString(baos.toString(StandardCharsets.ISO_8859_1));
             } catch (Exception e) {
                 System.out.println("JAVA: connection interrupted by browser:" +
                         (e.getCause() != null ? e.getCause().getClass().getSimpleName() : e.getMessage()));
@@ -69,16 +175,32 @@ public class LoxTcpCore {
         });
     }
 
-    public static CompletableFuture<Boolean> ___tcp_write___(AsynchronousSocketChannel socket, Object dataObj) {
+    public static CompletableFuture<Boolean> ___tcp_write___(Object sckt, Object dataObj) {
         CompletableFuture<Boolean> future = new CompletableFuture<>();
+
+        String data = dataObj instanceof LoxString loxStr ? loxStr.value : dataObj.toString();
+        byte[] bytes = data.getBytes(StandardCharsets.ISO_8859_1);
+
+        if (sckt instanceof SSLSocket sslSocket) {
+            return CompletableFuture.supplyAsync(() -> {
+                try {
+                    sslSocket.getOutputStream().write(bytes);
+                    sslSocket.getOutputStream().flush();
+                    return true;
+                } catch (Exception e) {
+                    return false;
+                }
+            });
+        }
+
+        AsynchronousSocketChannel socket = (AsynchronousSocketChannel) sckt;
 
         if (socket == null || !socket.isOpen()) {
             future.complete(false);
             return future;
         }
 
-        String data = dataObj instanceof LoxString loxStr ? loxStr.value : dataObj.toString();
-        ByteBuffer buffer = ByteBuffer.wrap(data.getBytes(StandardCharsets.UTF_8));
+        ByteBuffer buffer = ByteBuffer.wrap(bytes);
 
         socket.write(buffer, null, new java.nio.channels.CompletionHandler<Integer, Void>() {
             @Override
@@ -95,8 +217,16 @@ public class LoxTcpCore {
         return future;
     }
 
-    public static CompletableFuture<Boolean> ___tcp_close___(AsynchronousSocketChannel socket) {
+    public static CompletableFuture<Boolean> ___tcp_close___(Object sckt) {
         CompletableFuture<Boolean> future = new CompletableFuture<>();
+
+        if (sckt instanceof SSLSocket sslClient) {
+            return java.util.concurrent.CompletableFuture.supplyAsync(() -> {
+                try { sslClient.close(); return true; } catch (Exception e) { return false; }
+            });
+        }
+
+        AsynchronousSocketChannel socket = (AsynchronousSocketChannel) sckt;
 
         try {
             if (socket != null && socket.isOpen()) socket.close();
