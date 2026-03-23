@@ -577,7 +577,7 @@ public class Parser {
         keyValues.put(spread, new Expr.Spread(spread, expr));
       } else {
         Token key = consume(STRING, "Expect dictionary key.");
-        key.literal = ((String) key.literal).replace("\"", "");
+        key.literal = ((String) key.literal).replace("\"", "").replace("\\\"", "").trim();
         consume(COLON, "Expect ':' after dictionary key.");
 
         Expr value = expression();
@@ -641,8 +641,13 @@ public class Parser {
   }
 
   private Expr lazy() {
+    if (match(LEFT_BRACE)) {
+      List<Stmt> statements = block();
+      return new Expr.Lazy(null, statements);
+    }
+
     Expr expr = expression();
-    return new Expr.Lazy(expr);
+    return new Expr.Lazy(expr, null);
   }
 
   private Expr assignment() {

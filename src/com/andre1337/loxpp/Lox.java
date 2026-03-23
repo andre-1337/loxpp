@@ -24,6 +24,7 @@ public class Lox {
   static boolean hadRuntimeError = false;
   private static List<String> sourceFile;
   public static final Map<String, LoxModule> loadedModules = new HashMap<>();
+  public static String[] cliArgs;
 
   private static void checkFileExtension(String path) {
     if (!path.endsWith(".lox") && !path.endsWith(".loxlib")) {
@@ -54,14 +55,13 @@ public class Lox {
   }
 
   public static void main(String[] args) throws IOException {
-    if (args.length > 1) {
-      System.out.println("Usage: loxpp [script]");
-      System.exit(64);
-    } else if (args.length == 1) {
+    cliArgs = args;
+
+    if (args.length == 0) {
+      runPrompt();
+    } else {
       checkFileExtension(args[0]);
       runFile(args[0]);
-    } else {
-      runPrompt();
     }
   }
 

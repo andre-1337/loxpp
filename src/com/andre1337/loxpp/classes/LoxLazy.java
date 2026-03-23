@@ -1,7 +1,7 @@
 package com.andre1337.loxpp.classes;
 
 import com.andre1337.loxpp.interpreter.Interpreter;
-import com.google.common.base.Supplier;
+import java.util.function.Supplier;
 
 public class LoxLazy {
     private final Supplier<Object> supplier;

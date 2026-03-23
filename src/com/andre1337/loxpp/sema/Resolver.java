@@ -23,6 +23,8 @@ public class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
     LAMBDA,
     INITIALIZER,
     METHOD,
+    /// work around to allow `return` inside `lazy` blocks
+    LAZY_BLOCK,
   }
 
   private enum ClassType {
@@ -471,7 +473,19 @@ public class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
 
   @Override
   public Void visitLazyExpr(Expr.Lazy expr) {
-    resolve(expr.expr);
+    if (expr.expr != null) {
+      resolve(expr.expr);
+    } else {
+      FunctionType enclosingFunction = currentFunction;
+      currentFunction = FunctionType.LAZY_BLOCK;
+
+      beginScope();
+      resolve(expr.statements);
+      endScope();
+
+      currentFunction = enclosingFunction;
+    }
+
     return null;
   }
 

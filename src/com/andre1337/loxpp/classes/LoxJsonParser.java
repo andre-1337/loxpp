@@ -1,15 +1,19 @@
 package com.andre1337.loxpp.classes;
 
+import com.andre1337.loxpp.interpreter.Interpreter;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 public class LoxJsonParser {
+    private final Interpreter interpreter;
     private final String json;
     private int pos = 0;
 
-    public LoxJsonParser(String json) {
+    public LoxJsonParser(Interpreter interpreter, String json) {
+        this.interpreter = interpreter;
         this.json = json;
     }
 
@@ -68,14 +72,14 @@ public class LoxJsonParser {
         return map;
     }
 
-    private List<Object> parseArray() {
+    private LoxArray parseArray() {
         List<Object> list = new ArrayList<>();
         pos++;
         skipWhitespace();
 
         if (json.charAt(pos) == ']') {
             pos++;
-            return list;
+            return new LoxArray(interpreter, list);
         }
 
         while (pos < json.length()) {
@@ -85,13 +89,13 @@ public class LoxJsonParser {
             char c = json.charAt(pos);
             if (c == ']') {
                 pos++;
-                return list;
+                return new LoxArray(interpreter, list);
             }
 
             pos++;
         }
 
-        return list;
+        return new LoxArray(interpreter, list);
     }
 
     private LoxString parseString() {
@@ -118,8 +122,14 @@ public class LoxJsonParser {
     private Double parseNumber() {
         int start = pos;
 
-        while (pos < json.length() && (Character.isDigit(json.charAt(pos)) || json.charAt(pos) == '.' || json.charAt(pos) == '-')) {
-            pos++;
+        while (pos < json.length()) {
+            char c = json.charAt(pos);
+
+            if (Character.isDigit(c) || c == '.' || c == '-' || c == '+' || c == 'e' || c == 'E') {
+                pos++;
+            } else {
+                break;
+            }
         }
 
         return Double.parseDouble(json.substring(start, pos));

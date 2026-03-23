@@ -360,14 +360,16 @@ public abstract class Expr {
   }
 
   public static class Lazy extends Expr {
-    public Lazy(Expr expr) {
+    public Lazy(Expr expr, List<Stmt> statements) {
       this.expr = expr;
+      this.statements = statements;
     }
 
     @Override
     public <R> R accept(Visitor<R> visitor) { return visitor.visitLazyExpr(this); }
 
     public final Expr expr;
+    public final List<Stmt> statements;
   }
 
   public static class Spread extends Expr {

@@ -294,15 +294,16 @@ public class LoxString {
     }
 
     @Override
-    public boolean equals(Object other) {
-        if (other == null) {
-            return false;
-        }
+    public boolean equals(Object obj) {
+        if (this == obj) return true;
+        if (obj instanceof LoxString loxStr) return this.value.equals(loxStr.value);
+        if (obj instanceof String str) return this.value.equals(str);
 
-        if (!(other instanceof LoxString obj)) {
-            return false;
-        }
+        return false;
+    }
 
-        return this.value.equals(obj.value);
+    @Override
+    public int hashCode() {
+        return this.value.hashCode();
     }
 }

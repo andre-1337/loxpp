@@ -1,70 +1,79 @@
 package com.andre1337.loxpp.classes;
 
-import java.util.List;
+import java.text.DecimalFormat;
 import java.util.Map;
 
 public class LoxJsonStringifier {
-    public static String stringify(Object obj) {
-        if (obj == null) return "null";
-        if (obj instanceof Boolean) return obj.toString();
-
-        if (obj instanceof Double) {
-            String text = obj.toString();
-
-            if (text.endsWith(".0")) {
-                text = text.substring(0, text.length() - 2);
-            }
-
-            return text;
+    private static String cleanString(String str) {
+        if (str == null) return "";
+        if (str.startsWith("\"") && str.endsWith("\"") && str.length() >= 2) {
+            str = str.substring(1, str.length() - 1);
         }
 
-        if (obj instanceof String) return "\"" + escapeString((String) obj) + "\"";
-        if (obj instanceof LoxString) return "\"" + escapeString(((LoxString) obj).value) + "\"";
-
-        if (obj instanceof List<?> list) {
-            StringBuilder sb = new StringBuilder();
-            sb.append("[");
-
-            for (int i = 0; i < list.size(); i++) {
-                sb.append(stringify(list.get(i)));
-                if (i < list.size() - 1) sb.append(",");
-            }
-
-            sb.append("]");
-            return sb.toString();
-        }
-
-        if (obj instanceof Map<?, ?> map) {
-            StringBuilder sb = new StringBuilder();
-            sb.append("{");
-
-            int i = 0;
-            for (Map.Entry<?, ?> entry : map.entrySet()) {
-                String key = entry.getKey() instanceof LoxString ? ((LoxString) entry.getKey()).value : entry.getKey().toString();
-
-                if (key.startsWith("\"") && key.endsWith("\"") && key.length() >= 2) {
-                    key = key.substring(1, key.length() - 1);
-                }
-
-                sb.append("\"").append(escapeString(key)).append("\":");
-                sb.append(stringify(entry.getValue()));
-
-                if (i < map.size() - 1) sb.append(",");
-                i++;
-            }
-
-            sb.append("}");
-            return sb.toString();
-        }
-
-        return "\"" + obj + "\"";
+        return str.replace("\"", "\\\"");
     }
 
-    private static String escapeString(String str) {
-        return str.replace("\\", "\\\\")
-                .replace("\"", "\\\"")
-                .replace("\n", "\\n")
-                .replace("\r", "\\r")
-                .replace("\t", "\\t");
+    public static String stringify(Object obj) {
+        switch (obj) {
+            case null -> {
+                return "null";
+            }
+
+            case LoxString loxStr -> {
+                return "\"" + cleanString(loxStr.value.replace("\"", "\\\"")) + "\"";
+            }
+
+            case String str -> {
+                return "\"" + cleanString(str.replace("\"", "\\\"")) + "\"";
+            }
+
+            case Double d -> {
+                if (d == d.longValue()) {
+                    return String.valueOf(d.longValue());
+                } else {
+                    DecimalFormat df = new DecimalFormat("0.0###############");
+                    return df.format(d).replace(",", ".");
+                }
+            }
+
+            case Boolean ignored -> {
+                return obj.toString();
+            }
+
+            case Map<?, ?> map -> {
+                StringBuilder sb = new StringBuilder();
+                sb.append("{");
+                int count = 0;
+
+                for (Map.Entry<?, ?> entry : map.entrySet()) {
+                    String key = entry.getKey() instanceof LoxString ? ((LoxString) entry.getKey()).value : entry.getKey().toString();
+
+                    sb.append("\"").append(cleanString(key)).append("\":");
+                    sb.append(stringify(entry.getValue()));
+
+                    if (++count < map.size()) sb.append(",");
+                }
+
+                sb.append("}");
+                return sb.toString();
+            }
+
+            case LoxArray array -> {
+                StringBuilder sb = new StringBuilder();
+                sb.append("[");
+
+                for (int i = 0; i < array.elements.size(); i++) {
+                    sb.append(stringify(array.elements.get(i)));
+                    if (i < array.elements.size() - 1) sb.append(",");
+                }
+
+                sb.append("]");
+                return sb.toString();
+            }
+
+            default -> {
+                return "\"" + cleanString(obj.toString()) + "\"";
+            }
+        }
     }
 }

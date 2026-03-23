@@ -17,6 +17,7 @@ import java.nio.channels.AsynchronousServerSocketChannel;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.security.MessageDigest;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
@@ -132,7 +133,7 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
       public Object call(Interpreter interpreter, List<Object> arguments, boolean isNewCall) {
         Object arg = arguments.getFirst();
         String jsonStr = (arg instanceof LoxString loxStr) ? loxStr.value : arg.toString();
-        LoxJsonParser jsonParser = new LoxJsonParser(jsonStr);
+        LoxJsonParser jsonParser = new LoxJsonParser(interpreter, jsonStr);
 
         return jsonParser.parse();
       }
@@ -446,6 +447,190 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
         });
       }
     });
+
+    globals.define("___uuid___", new LoxCallable() {
+      @Override
+      public int arity() {
+        return 0;
+      }
+
+      @Override
+      public Object call(Interpreter interpreter, List<Object> arguments, boolean isNewCall) {
+        return new LoxString(UUID.randomUUID().toString());
+      }
+    });
+
+    globals.define("___rename_file___", new LoxCallable() {
+      @Override
+      public int arity() {
+        return 2; // 1: old path, 2: new path
+      }
+
+      @Override
+      public Object call(Interpreter interpreter, List<Object> arguments, boolean isNewCall) {
+        String oldPath = arguments.getFirst() instanceof LoxString loxStr ? loxStr.value : arguments.getFirst().toString();
+        oldPath = oldPath.replace("\"", "").trim();
+
+        String newPath = arguments.get(1) instanceof LoxString loxStr ? loxStr.value : arguments.get(1).toString();
+        newPath = newPath.replace("\"", "").trim();
+
+        try {
+          Files.move(Path.of(oldPath), Path.of(newPath), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+          return true;
+        } catch (Exception e) {
+          System.err.println("Java Replace Error: " + e.getMessage());
+          return false;
+        }
+      }
+    });
+
+    globals.define("___sort_docs___", new LoxCallable() {
+      @Override
+      public int arity() {
+        return 3; //1: array, 2: sort key, 3: ascending
+      }
+
+      private Object getMapValue(Map<?, ?> map, String searchKey) {
+        for (Map.Entry<?, ?> entry: map.entrySet()) {
+          String k = entry.getKey() instanceof LoxString loxStr ? loxStr.value : entry.getKey().toString();
+          k = k.replace("\"", "");
+          if (k.equals(searchKey)) return entry.getValue();
+        }
+
+        return null;
+      }
+
+      @Override
+      public Object call(Interpreter interpreter, List<Object> arguments, boolean isNewCall) {
+        if (!(arguments.getFirst() instanceof LoxArray loxArray)) return arguments.getFirst();
+
+        String key = arguments.get(1) instanceof LoxString loxStr ? loxStr.value : arguments.get(1).toString();
+        key = key.replace("\"", "");
+
+        boolean ascending = (boolean) arguments.get(2);
+        List<Object> sorted = new ArrayList<>(loxArray.elements);
+        String finalKey = key;
+
+        sorted.sort((a, b) -> {
+          if (!(a instanceof Map<?, ?> mapA) || !(b instanceof Map<?, ?> mapB)) return 0;
+
+          Object valA = getMapValue(mapA, finalKey);
+          Object valB = getMapValue(mapB, finalKey);
+
+          if (valA == null && valB == null) return 0;
+          if (valA == null) return ascending ? -1 : 1;
+          if (valB == null) return ascending ? 1 : -1;
+
+          int comparison;
+          if (valA instanceof Double dA && valB instanceof Double dB) {
+            comparison = Double.compare(dA, dB);
+          } else if (valA instanceof Boolean bA && valB instanceof Boolean bB) {
+            comparison = Boolean.compare(bA, bB);
+          } else {
+            String strA = valA instanceof LoxString loxStr ? loxStr.value : valA.toString();
+            String strB = valB instanceof LoxString loxStr ? loxStr.value : valB.toString();
+
+            comparison = strA.compareTo(strB);
+          }
+
+          return ascending ? comparison : -comparison;
+        });
+
+        return new LoxArray(interpreter, sorted);
+      }
+    });
+
+    globals.define("___cli_args___", new LoxCallable() {
+      @Override
+      public int arity() {
+        return 0;
+      }
+
+      @Override
+      public Object call(Interpreter interpreter, List<Object> arguments, boolean isNewCall) {
+        List<Object> argsList = new ArrayList<>();
+
+        if (Lox.cliArgs != null) {
+          for (int i = 1; i < Lox.cliArgs.length; i++) {
+            argsList.add(new LoxString(Lox.cliArgs[i]));
+          }
+        }
+
+        return new LoxArray(interpreter, argsList);
+      }
+    });
+
+    globals.define("___os_mkdir___", new LoxCallable() {
+      @Override
+      public int arity() {
+        return 1;
+      }
+
+      @Override
+      public Object call(Interpreter interpreter, List<Object> arguments, boolean isNewCall) {
+        String dirPath = arguments.getFirst() instanceof LoxString loxStr ? loxStr.value : arguments.getFirst().toString();
+        dirPath = dirPath.replace("\"", "").trim();
+
+        try {
+          Files.createDirectories(Path.of(dirPath));
+          return true;
+        } catch (Exception e) {
+          System.err.println("Java MKDIR Error: " + e.getMessage());
+          return false;
+        }
+      }
+    });
+
+    globals.define("___os_remove___", new LoxCallable() {
+      @Override
+      public int arity() {
+        return 1;
+      }
+
+      @Override
+      public Object call(Interpreter interpreter, List<Object> arguments, boolean isNewCall) {
+        String filePath = arguments.getFirst() instanceof LoxString loxStr ? loxStr.value : arguments.getFirst().toString();
+        filePath = filePath.replace("\"", "").trim();
+
+        try {
+          return Files.deleteIfExists(Path.of(filePath));
+        } catch (Exception e) {
+          System.err.println("Java OS REMOVE error: " + e.getMessage());
+          return false;
+        }
+      }
+    });
+
+    globals.define("___os_exec___", new LoxCallable() {
+      @Override
+      public int arity() {
+        return 1;
+      }
+
+      @Override
+      public Object call(Interpreter interpreter, List<Object> arguments, boolean isNewCall) {
+        String command = arguments.getFirst() instanceof LoxString loxStr ? loxStr.value : arguments.getFirst().toString();
+
+        try {
+          ProcessBuilder pb;
+
+          if (System.getProperty("os.name").toLowerCase().contains("win")) {
+            pb = new ProcessBuilder("cmd.exe", "/c", command);
+          } else {
+            pb = new ProcessBuilder("bash", "-c", command);
+          }
+
+          pb.inheritIO();
+          Process process = pb.start();
+          process.waitFor();
+
+          return (double) process.exitValue();
+        } catch (Exception e) {
+          System.err.println("Java Exec Error: " + e.getMessage());
+          return -1.0;
+        }
+      }
+    });
   }
 
   public void interpret(List<Stmt> statements) {
@@ -460,7 +645,7 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
 
   private Object evaluate(Expr expr) {
     if (expr == null) return null;
-    return getValue(expr.accept(this));
+    return expr.accept(this);
   }
 
   private void execute(Stmt stmt) {
@@ -630,20 +815,20 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
 
     for (Expr traitExpr : traits) {
       Object traitObj = evaluate(traitExpr);
-      if (!(traitObj instanceof LoxTrait trait)) {
+      if (!(traitObj instanceof  LoxTrait(Token name1, Map<String, LoxFunction> methods1))) {
         Token name = ((Expr.Variable) traitExpr).name;
         throw new RuntimeError(name, "RuntimeError", "'" + name.lexeme + "' is not a trait.", null);
       }
 
-      for (String name : trait.methods().keySet()) {
+      for (String name : methods1.keySet()) {
         if (methods.containsKey(name)) {
-          throw new RuntimeError(trait.name(), "RuntimeError",
+          throw new RuntimeError(name1, "RuntimeError",
               "A previously implemented trait already declares method '" + name + "'.",
                   "Consider removing or renaming the method '" + name + "'."
           );
         }
 
-        methods.put(name, trait.methods().get(name));
+        methods.put(name, methods1.get(name));
       }
     }
 
@@ -719,7 +904,7 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
 
   @Override
   public Void visitObjectDestructuringStmt(Stmt.ObjectDestructuring stmt) {
-    Object value = evaluate(stmt.initializer);
+    Object value = getValue(evaluate(stmt.initializer));
 
     if (!(value instanceof Map<?, ?> dict)) {
       throw new RuntimeError(stmt.keyword, "RuntimeError", "Cannot destructure non-object.", "Object must be a dictionary in order to be destructible.");
@@ -741,7 +926,7 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
 
   @Override
   public Void visitArrayDestructuringStmt(Stmt.ArrayDestructuring stmt) {
-    Object value = evaluate(stmt.initializer);
+    Object value = getValue(evaluate(stmt.initializer));
 
     if (!(value instanceof LoxArray array)) {
       throw new RuntimeError(stmt.keyword, "RuntimeError", "Cannot destructure non-array.", "Object must be an array in order to be destructible.");
@@ -771,7 +956,7 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
 
   @Override
   public Void visitForInStmt(Stmt.ForIn stmt) {
-    Object iterable = evaluate(stmt.iterable);
+    Object iterable = getValue(evaluate(stmt.iterable));
 
     switch (iterable) {
       case LoxArray loxArray -> {
@@ -805,10 +990,16 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
 
       case Map<?, ?> dictionary -> {
         for (Map.Entry<?, ?> entry : dictionary.entrySet()) {
-          environment.define(stmt.key.lexeme, entry.getKey());
+          Object mapKey = entry.getKey();
+          Object mapVal = entry.getValue();
+
+          if (mapKey instanceof String str) mapKey = new LoxString(str);
+          if (mapVal instanceof String str) mapVal = new LoxString(str);
+
+          environment.define(stmt.key.lexeme, mapKey);
 
           if (stmt.value != null) {
-            environment.define(stmt.value.lexeme, entry.getValue());
+            environment.define(stmt.value.lexeme, mapVal);
           }
 
           executeBlock(stmt.body, environment);
@@ -1030,7 +1221,7 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
     Token name = ((Expr.Variable) stmt.name).name;
     Object type = environment.get(name);
 
-    if (!(type instanceof LoxEnum loxEnum) || !((LoxEnum) type).isUnion) {
+    if (!(type instanceof LoxEnum loxEnum) || !loxEnum.isUnion) {
       throw new RuntimeError(stmt.keyword, "RuntimeError", "Can only implement methods on unions.", "Make sure the type is a union.");
     }
 
@@ -1073,7 +1264,7 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
 
   @Override
   public Object visitAwaitExpr(Expr.Await expr) {
-    Object value = evaluate(expr.value);
+    Object value = getValue(evaluate(expr.value));
 
     if (!(value instanceof CompletableFuture<?> promise)) {
       throw new RuntimeError(expr.keyword, "RuntimeError", "Can only await a promise.", null);
@@ -1098,7 +1289,7 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
 
   @Override
   public Object visitMatchExpr(Expr.Match expr) {
-    Object value = evaluate(expr.value);
+    Object value = getValue(evaluate(expr.value));
     Environment originalEnv = environment;
 
     try {
@@ -1266,7 +1457,7 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
 
   @Override
   public Object visitSpreadExpr(Expr.Spread expr) {
-    Object value = evaluate(expr.right);
+    Object value = getValue(evaluate(expr.right));
 
     if (value instanceof LoxArray array) {
       return array.elements;
@@ -1281,7 +1472,26 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
 
   @Override
   public Object visitLazyExpr(Expr.Lazy expr) {
-    return new LoxLazy(() -> evaluate(expr.expr));
+    Environment closure = environment;
+
+    return new LoxLazy(() -> {
+      Environment previous = environment;
+
+      try {
+        this.environment = new Environment(closure);
+
+        if (expr.expr != null) {
+          return evaluate(expr.expr);
+        } else {
+          executeBlock(expr.statements, environment);
+          return null;
+        }
+      } catch (Return returnValue) {
+        return returnValue.value;
+      } finally {
+        environment = previous;
+      }
+    });
   }
 
   @Override
@@ -1299,7 +1509,7 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
     Object value = evaluate(expr.var);
 
     if (value != null) {
-      return switch (value.getClass().getSimpleName()) {
+      String ty = switch (value.getClass().getSimpleName()) {
         case "Double", "Integer" -> "Double";
         case "String" -> "String";
         case "LoxString" -> "LoxString";
@@ -1317,6 +1527,8 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
 
         default -> null;
       };
+
+      return new LoxString(ty);
     }
 
     return null;
@@ -1373,8 +1585,8 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
 
   @Override
   public Object visitArraySubscriptGetExpr(Expr.SubscriptGet expr) {
-    Object indexee = evaluate(expr.indexee);
-    Object index = evaluate(expr.index);
+    Object indexee = getValue(evaluate(expr.indexee));
+    Object index = getValue(evaluate(expr.index));
 
     if (indexee instanceof Map<?, ?> dict) {
       String searchKey = (index instanceof LoxString loxStr) ? loxStr.value : index.toString();
@@ -1415,13 +1627,12 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
   @SuppressWarnings("unchecked")
   @Override
   public Object visitArraySubscriptSetExpr(Expr.SubscriptSet expr) {
-    Object indexee = evaluate(expr.indexee);
+    Object indexee = getValue(evaluate(expr.indexee));
+    Object index = getValue(evaluate(expr.index));
+    Object value = getValue(evaluate(expr.value));
 
     switch (indexee) {
       case Map<?, ?> dictionary -> {
-        Object index = evaluate(expr.index);
-        Object value = evaluate(expr.value);
-
         String keyStr = (index instanceof LoxString loxStr) ? loxStr.value : index.toString();
 
         Map<String, Object> dict = (Map<String, Object>) dictionary;
@@ -1429,17 +1640,11 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
         return value;
       }
       case LoxIndexable indexable -> {
-        Object index = evaluate(expr.index);
-        Object value = evaluate(expr.value);
-
         indexable.set(expr.bracket, index, value);
 
         return value;
       }
       case LoxInstance instance -> {
-        Object index = evaluate(expr.index);
-        Object value = evaluate(expr.value);
-
         LoxTrait indexableTrait = (LoxTrait) environment.get("Indexable");
         if (!instance.klass.hasTrait(indexableTrait)) {
           throw new RuntimeError(instance.klass.token, "RuntimeError", "Class '" + instance.klass.name + "' does not implement trait 'Indexable'.", "Consider implementing the 'Indexable' trait and its methods: 'get' and 'set'.");
@@ -1487,8 +1692,8 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
 
   @Override
   public Object visitBinaryExpr(Expr.Binary expr) {
-    Object left = evaluate(expr.left);
-    Object right = evaluate(expr.right);
+    Object left = getValue(evaluate(expr.left));
+    Object right = getValue(evaluate(expr.right));
 
     String operatorMethod = getMethodName(expr.operator.type);
     LoxTrait computableTrait = (LoxTrait) environment.get("Computable");
@@ -1636,13 +1841,13 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
 
   @Override
   public Object visitCallExpr(Expr.Call expr) {
-    Object callee = evaluate(expr.callee);
+    Object callee = getValue(evaluate(expr.callee));
 
       switch (callee) {
           case LoxCallable function -> {
               List<Object> arguments = new ArrayList<>();
               for (Expr argument : expr.arguments) {
-                  arguments.add(evaluate(argument));
+                  arguments.add(getValue(evaluate(argument)));
               }
 
               if (callee instanceof LoxUnionConstructor loxUnionConstructor) {
@@ -1664,7 +1869,7 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
 
   @Override
   public Object visitGetExpr(Expr.Get expr) {
-    Object object = evaluate(expr.object);
+    Object object = getValue(evaluate(expr.object));
 
     if (object instanceof LoxInstance instance) {
       LoxFunction method = instance.klass.findMethod(expr.name.lexeme);
@@ -1802,7 +2007,7 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
 
   @Override
   public Object visitUnaryExpr(Expr.Unary expr) {
-    Object right = evaluate(expr.right);
+    Object right = getValue(evaluate(expr.right));
 
     if (expr.operator.type == TokenType.MINUS) {
       checkNumberOperand(expr.operator, right);
@@ -1865,58 +2070,57 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
   }
 
   private boolean isTruthy(Object object) {
-    if (object == null) {
-      return false;
-    }
+    object = getValue(object);
 
-    if (object instanceof Boolean) {
-      return (boolean) object;
-    }
+    if (object == null) return false;
+    if (object instanceof Boolean bool) return bool;
+
     return true;
   }
 
   private boolean isEqual(Object a, Object b) {
-    if (a == null && b == null) {
-      return true;
-    }
+    a = getValue(a);
+    b = getValue(b);
 
-    if (a == null) {
-      return false;
-    }
+    if (a == null && b == null) return true;
+    if (a == null) return false;
 
     return a.equals(b);
   }
 
   public static String stringify(Object object) {
-    if (object == null)
-      return "null";
+      return switch (object) {
+          case null -> "null";
 
-    if (object instanceof Double) {
-      String text = object.toString();
-      if (text.endsWith(".0")) {
-        text = text.substring(0, text.length() - 2);
-      }
-      return text;
-    }
+          case Double ignored -> {
+              String text = object.toString();
+              if (text.endsWith(".0")) {
+                  text = text.substring(0, text.length() - 2);
+              }
 
-    if (object instanceof Map<?, ?> dictionary) {
-      StringBuilder sb = new StringBuilder();
-      sb.append("{ ");
-      boolean first = true;
-      for (Map.Entry<?, ?> entry : dictionary.entrySet()) {
-        if (!first) {
-          sb.append(", ");
-        }
-        first = false;
-        sb.append(entry.getKey().toString())
-                .append(": ")
-                .append(stringify(entry.getValue()));
-      }
-      sb.append(" }");
-      return sb.toString();
-    }
+              yield text;
+          }
 
-    return object.toString();
+          case Map<?, ?> dictionary -> {
+              StringBuilder sb = new StringBuilder();
+              sb.append("{ ");
+              boolean first = true;
+              for (Map.Entry<?, ?> entry : dictionary.entrySet()) {
+                  if (!first) {
+                      sb.append(", ");
+                  }
+                  first = false;
+                  sb.append(entry.getKey().toString())
+                          .append(": ")
+                          .append(stringify(entry.getValue()));
+              }
+              sb.append(" }");
+
+              yield sb.toString();
+          }
+
+          default -> object.toString();
+      };
   }
 
   private Object getValue(Object obj) {

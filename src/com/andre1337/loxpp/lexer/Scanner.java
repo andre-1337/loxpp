@@ -235,10 +235,8 @@ public class Scanner {
       advance();
 
     if (peek() == '.' && isDigit(peekNext())) {
-      advance();
-
-      while (isDigit(peek()))
-        advance();
+        do advance();
+        while (isDigit(peek()));
     }
 
     addToken(NUMBER, Double.parseDouble(source.substring(start, current)));
