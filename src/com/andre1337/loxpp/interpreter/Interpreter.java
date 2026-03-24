@@ -1937,8 +1937,25 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
     Object object = getValue(evaluate(expr.object));
 
     if (object instanceof LoxInstance instance) {
+      if (expr.cachedClass == instance.klass) {
+        if (expr.isMethod) {
+          return instance.klass.methods.get(expr.name.lexeme).bind(instance);
+        }
+        return instance.fields[expr.cachedPropertyIndex];
+      }
+
+      Integer index = instance.klass.fieldLayout.get(expr.name.lexeme);
+      if (index != null) {
+        expr.cachedClass = instance.klass;
+        expr.cachedPropertyIndex = index;
+        expr.isMethod = false;
+        return instance.fields[index];
+      }
+
       LoxFunction method = instance.klass.findMethod(expr.name.lexeme);
       if (method != null) {
+        expr.cachedClass = instance.klass;
+        expr.isMethod = true;
         return method.bind(instance);
       }
 
@@ -2042,12 +2059,25 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
   public Object visitSetExpr(Expr.Set expr) {
     Object object = evaluate(expr.object);
 
-    if (!(object instanceof LoxInstance)) {
+    if (!(object instanceof LoxInstance instance)) {
       throw new RuntimeError(expr.name, "RuntimeError", "Only instances have fields.", null);
     }
 
     Object value = evaluate(expr.value);
-    ((LoxInstance) object).set(expr.name, value);
+
+    if (expr.cachedClass == instance.klass && expr.cachedPropertyIndex != -1) {
+      instance.fields[expr.cachedPropertyIndex] = value;
+      return value;
+    }
+
+    instance.set(expr.name, value);
+
+    Integer index = instance.klass.fieldLayout.get(expr.name.lexeme);
+    if (index != null && instance.klass.isShapeLocked) {
+      expr.cachedClass = instance.klass;
+      expr.cachedPropertyIndex = index;
+    }
+
     return value;
   }
 

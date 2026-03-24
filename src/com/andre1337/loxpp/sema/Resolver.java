@@ -11,7 +11,6 @@ import java.util.*;
 public class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
   private final Interpreter interpreter;
 
-  // 🚨 Tracks the variable's index in the block array
   private static class LocalVar {
     final int index;
     boolean initialized;

@@ -15,6 +15,9 @@ public class LoxClass extends LoxInstance implements LoxCallable {
   public final Map<String, LoxFunction> methods;
   public final Interpreter interpreter;
 
+  public final Map<String, Integer> fieldLayout = new HashMap<>();
+  public boolean isShapeLocked = false;
+
   final LoxClass meta;
 
   public LoxClass(LoxClass meta, String name, Token token, LoxClass superclass, Map<String, LoxFunction> methods, Interpreter interpreter) {
@@ -28,6 +31,10 @@ public class LoxClass extends LoxInstance implements LoxCallable {
     this.token = token;
     this.methods = methods;
     this.interpreter = interpreter;
+
+    if (superclass != null) {
+      this.fieldLayout.putAll(superclass.fieldLayout);
+    }
   }
 
   public void addTrait(LoxTrait trait) {
@@ -64,14 +71,15 @@ public class LoxClass extends LoxInstance implements LoxCallable {
       initializer.bind(instance).call(interpreter, arguments, false);
     }
 
+    isShapeLocked = true;
+
     return instance;
   }
 
   @Override
   public int arity() {
     LoxFunction initializer = findMethod("init");
-    if (initializer == null)
-      return 0;
+    if (initializer == null) return 0;
     return initializer.arity();
   }
 }

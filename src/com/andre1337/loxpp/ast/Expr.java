@@ -1,5 +1,6 @@
 package com.andre1337.loxpp.ast;
 
+import com.andre1337.loxpp.classes.LoxClass;
 import com.andre1337.loxpp.lexer.Token;
 
 import java.util.List;
@@ -130,6 +131,11 @@ public abstract class Expr {
 
     public final Expr object;
     public final Token name;
+
+    // inline caching fields
+    public LoxClass cachedClass = null;
+    public int cachedPropertyIndex = -1;
+    public boolean isMethod = false;
   }
 
   public static class Grouping extends Expr {
@@ -190,6 +196,10 @@ public abstract class Expr {
     public final Expr object;
     public final Token name;
     public final Expr value;
+
+    //inline caching fields
+    public LoxClass cachedClass = null;
+    public int cachedPropertyIndex = -1;
   }
 
   public static class Super extends Expr {

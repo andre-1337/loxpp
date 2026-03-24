@@ -717,3 +717,46 @@ impl Result {
         * -> self;
     };
 }
+
+// raw recursive fib
+fn fib(n) {
+    if (n < 2) return n;
+    return fib(n - 1) + fib(n - 2);
+}
+
+println("running test 1: fib(30)...");
+
+let start_time = clock();
+let result = fib(30);
+let end_time = clock();
+
+println("result: " + result);
+println("time taken: " + (end_time - start_time) + " seconds");
+println("");
+
+// object oriented fib to test new ast inline caching
+class FibCompute {
+    fn init() {
+        self.operations = 0;
+    }
+
+    fn calc(n) {
+        self.operations = self.operations + 1;
+
+        if (n < 2) return n;
+        return self.calc(n - 1) + self.calc(n - 2);
+    }
+}
+
+println("running test 2: fib(30)...");
+
+let comp = new FibCompute();
+let start_obj = clock();
+let res_obj = comp.calc(30);
+let end_obj = clock();
+
+println("result: " + res_obj);
+println("ast cache hits (ops): " + comp.operations);
+println("time taken: " + (end_obj - start_obj) + " seconds");
+println("");
+println("==========================================");
