@@ -6,15 +6,15 @@ import java.util.HashMap;
 import java.util.Map;
 
 public class LoxModule {
-    private final Map<String, LoxNamespace> namespaces = new HashMap<>();
+    private final Map<String, Object> members = new HashMap<>();
 
-    public void addNamespace(String name, LoxNamespace namespace) {
-        namespaces.put(name, namespace);
+    public void addMember(String name, Object member) {
+        members.put(name, member);
     }
 
     public Object getMember(Token name) {
-        if (namespaces.containsKey(name.lexeme)) {
-            return namespaces.get(name.lexeme);
+        if (members.containsKey(name.lexeme)) {
+            return members.get(name.lexeme);
         }
 
         throw new RuntimeError(name, "RuntimeError", "Module does not contain member '" + name.lexeme + "'.", "Check the spelling of the namespace name.");

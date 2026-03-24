@@ -11,7 +11,6 @@ import com.andre1337.loxpp.parser.Parser;
 import com.andre1337.loxpp.sema.Resolver;
 
 import java.io.File;
-import java.io.IOException;
 import java.net.http.HttpClient;
 import java.nio.channels.AsynchronousServerSocketChannel;
 import java.nio.charset.StandardCharsets;
@@ -27,6 +26,8 @@ import java.util.concurrent.ExecutionException;
 public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
   private Map<Expr, Integer> locals = new HashMap<>();
   private static final Object uninitialized = new Object();
+  private static final Map<String, LoxModule> moduleCache = new HashMap<>();
+  private static final Set<String> loadingModules = new HashSet<>();
   public Environment globals = new Environment();
   public Environment environment = globals;
 
@@ -631,6 +632,31 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
         }
       }
     });
+
+    globals.define("___os_rmdir___", new LoxCallable() {
+      @Override
+      public int arity() {
+        return 1;
+      }
+
+      @Override
+      public Object call(Interpreter interpreter, List<Object> arguments, boolean isNewCall) {
+        String dirPath = arguments.getFirst() instanceof LoxString loxStr ? loxStr.value : arguments.getFirst().toString();
+        dirPath = dirPath.replace("\"", "");
+
+        try {
+          Path rootPath = Path.of(dirPath);
+          if (Files.exists(rootPath)) {
+            Files.walk(rootPath).sorted(Comparator.reverseOrder()).map(Path::toFile).forEach(File::delete);
+          }
+
+          return true;
+        } catch (Exception e) {
+          System.err.println("Java OS RMDIR Error: " + e.getMessage());
+          return false;
+        }
+      }
+    });
   }
 
   public void interpret(List<Stmt> statements) {
@@ -1134,22 +1160,55 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
     return null;
   }
 
-  private LoxModule loadModule(String path, Token location) {
-    File file = new File(path);
-    String absolutePath = file.getAbsolutePath();
+  private LoxModule loadModule(String importPath, Token keyword) {
+    String resolvedPath = resolveImportPath(importPath);
 
-    if (Lox.loadedModules.containsKey(absolutePath)) {
-      return Lox.loadedModules.get(absolutePath);
-    }
-
-    String source;
     try {
-      source = Files.readString(file.toPath());
-    } catch (IOException e) {
-      throw new RuntimeError(location, "RuntimeError", "Could not read file '" + path + "'.", "Make sure that the path or location is correct.");
+      java.nio.file.Path path = java.nio.file.Path.of(resolvedPath).toAbsolutePath().normalize();
+      String absoluteString = path.toString();
+
+      if (moduleCache.containsKey(absoluteString)) {
+        return moduleCache.get(absoluteString);
+      }
+
+      if (loadingModules.contains(absoluteString)) {
+        throw new RuntimeError(keyword, "CircularDependencyError",
+                "Circular dependency detected! '" + absoluteString + "' is already loading.", null);
+      }
+
+      loadingModules.add(absoluteString);
+
+      byte[] bytes = java.nio.file.Files.readAllBytes(path);
+      String source = new String(bytes, java.nio.charset.Charset.defaultCharset());
+
+      LoxModule module = executeAsModule(source);
+
+      moduleCache.put(absoluteString, module);
+      loadingModules.remove(absoluteString);
+
+      return module;
+
+    } catch (java.io.IOException e) {
+      throw new RuntimeError(keyword, "RuntimeError", "Could not load module: " + importPath, null);
+    }
+  }
+
+  private String resolveImportPath(String importPath) {
+    if (importPath.endsWith(".lox") || importPath.endsWith(".loxlib")) return importPath;
+
+    Path directPath = Path.of(importPath);
+    if (Files.exists(directPath) && !Files.isDirectory(directPath)) {
+      return importPath;
     }
 
-    return executeAsModule(source);
+    String modulePath = "lox_modules/" + importPath + "/index.loxlib";
+    Path modPath = Path.of(modulePath);
+
+    if (Files.exists(modPath)) {
+      return modulePath;
+    }
+
+    return importPath;
   }
 
   private LoxModule executeAsModule(String source) {
@@ -1167,9 +1226,7 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
     LoxModule module = new LoxModule();
 
     for (Map.Entry<String, Object> entry : moduleInterpreter.environment.values.entrySet()) {
-      if (entry.getValue() instanceof LoxNamespace ns) {
-        module.addNamespace(entry.getKey(), ns);
-      }
+        module.addMember(entry.getKey(), entry.getValue());
     }
 
     return module;
@@ -1180,7 +1237,8 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
     Object source = evaluate(stmt.source);
 
     if (source instanceof LoxString path) {
-      LoxModule container = loadModule(path.value, stmt.keyword);
+      String resolvedPath = resolveImportPath(path.value);
+      LoxModule container = loadModule(resolvedPath, stmt.keyword);
 
       for (Expr.Variable nameExpr : stmt.names) {
         Object member = container.getMember(nameExpr.name);
