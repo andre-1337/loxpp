@@ -24,14 +24,24 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 
 public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
-  private Map<Expr, Integer> locals = new HashMap<>();
+
+  public static class LocalLocation {
+    public final int depth;
+    public final int index;
+    public LocalLocation(int depth, int index) {
+      this.depth = depth;
+      this.index = index;
+    }
+  }
+
+  private Map<Expr, LocalLocation> locals = new HashMap<>();
   private static final Object uninitialized = new Object();
   private static final Map<String, LoxModule> moduleCache = new HashMap<>();
   private static final Set<String> loadingModules = new HashSet<>();
   public Environment globals = new Environment();
   public Environment environment = globals;
 
-  private Interpreter(Environment globals, Map<Expr, Integer> locals) {
+  private Interpreter(Environment globals, Map<Expr, LocalLocation> locals) {
     this.globals = globals;
     this.environment = globals;
     this.locals = locals;
@@ -678,8 +688,8 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
     stmt.accept(this);
   }
 
-  public void resolve(Expr expr, int depth) {
-    locals.put(expr, depth);
+  public void resolve(Expr expr, int depth, int index) {
+    locals.put(expr, new LocalLocation(depth, index));
   }
 
   public void executeBlock(List<Stmt> statements, Environment env) {
@@ -841,7 +851,7 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
 
     for (Expr traitExpr : traits) {
       Object traitObj = evaluate(traitExpr);
-      if (!(traitObj instanceof  LoxTrait(Token name1, Map<String, LoxFunction> methods1))) {
+      if (!(traitObj instanceof LoxTrait(Token name1, Map<String, LoxFunction> methods1))) {
         Token name = ((Expr.Variable) traitExpr).name;
         throw new RuntimeError(name, "RuntimeError", "'" + name.lexeme + "' is not a trait.", null);
       }
@@ -849,7 +859,7 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
       for (String name : methods1.keySet()) {
         if (methods.containsKey(name)) {
           throw new RuntimeError(name1, "RuntimeError",
-              "A previously implemented trait already declares method '" + name + "'.",
+                  "A previously implemented trait already declares method '" + name + "'.",
                   "Consider removing or renaming the method '" + name + "'."
           );
         }
@@ -869,7 +879,7 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
     for (Stmt.Function method : stmt.methods) {
       if (methods.containsKey(method.name.lexeme)) {
         throw new RuntimeError(method.name, "RuntimeError",
-            "A previously implemented trait already declares method '" + method.name.lexeme + "'.",
+                "A previously implemented trait already declares method '" + method.name.lexeme + "'.",
                 "Consider removing or renaming the method '" + method.name.lexeme + "'."
         );
       }
@@ -958,14 +968,11 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
       throw new RuntimeError(stmt.keyword, "RuntimeError", "Cannot destructure non-array.", "Object must be an array in order to be destructible.");
     }
 
-    for (Token key : stmt.bindings) {
-      if (key.lexeme.equals("_")) {
-        continue;
-      }
+    for (int i = 0; i < stmt.bindings.size(); i++) {
+      Token key = stmt.bindings.get(i);
+      if (key.lexeme.equals("_")) continue;
 
-      for (int i = 0; i < stmt.bindings.size(); i++) {
-        environment.define(stmt.bindings.get(i).lexeme, array.elements.get(i));
-      }
+      environment.define(key.lexeme, array.elements.get(i));
     }
 
     return null;
@@ -1057,12 +1064,12 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
       }
 
       case null, default ->
-        throw new RuntimeError(
-                stmt.keyword,
-                "RuntimeError",
-                "For-in loops only work with arrays, tuples, dictionaries, strings and objects that implement the 'Iterable' trait.",
-                null
-        );
+              throw new RuntimeError(
+                      stmt.keyword,
+                      "RuntimeError",
+                      "For-in loops only work with arrays, tuples, dictionaries, strings and objects that implement the 'Iterable' trait.",
+                      null
+              );
     }
 
     return null;
@@ -1226,7 +1233,7 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
     LoxModule module = new LoxModule();
 
     for (Map.Entry<String, Object> entry : moduleInterpreter.environment.values.entrySet()) {
-        module.addMember(entry.getKey(), entry.getValue());
+      module.addMember(entry.getKey(), entry.getValue());
     }
 
     return module;
@@ -1721,10 +1728,10 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
   @Override
   public Object visitAssignExpr(Expr.Assign expr) {
     Object value = evaluate(expr.value);
-    Integer distance = locals.get(expr);
+    LocalLocation loc = locals.get(expr);
 
-    if (distance != null) {
-      environment.assignAt(distance, expr.name, value);
+    if (loc != null) {
+      environment.assignAt(loc.depth, expr.name, loc.index, value);
     } else {
       globals.assign(expr.name, value);
     }
@@ -1901,28 +1908,28 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
   public Object visitCallExpr(Expr.Call expr) {
     Object callee = getValue(evaluate(expr.callee));
 
-      switch (callee) {
-          case LoxCallable function -> {
-              List<Object> arguments = new ArrayList<>();
-              for (Expr argument : expr.arguments) {
-                  arguments.add(getValue(evaluate(argument)));
-              }
+    switch (callee) {
+      case LoxCallable function -> {
+        List<Object> arguments = new ArrayList<>();
+        for (Expr argument : expr.arguments) {
+          arguments.add(getValue(evaluate(argument)));
+        }
 
-              if (callee instanceof LoxUnionConstructor loxUnionConstructor) {
-                return loxUnionConstructor.call(this, arguments, false);
-              }
+        if (callee instanceof LoxUnionConstructor loxUnionConstructor) {
+          return loxUnionConstructor.call(this, arguments, false);
+        }
 
-              if (function instanceof LoxFunction fn) {
-                arguments = fillDefaultArguments(fn, arguments, expr.paren);
-              }
+        if (function instanceof LoxFunction fn) {
+          arguments = fillDefaultArguments(fn, arguments, expr.paren);
+        }
 
-              return function.call(this, arguments, false);
-          }
-
-          case LoxTrait trait -> throw new RuntimeError(trait.name(), "RuntimeError", "Traits cannot be constructed nor instantiated.", null);
-
-        case null, default -> throw new RuntimeError(expr.paren, "RuntimeError", "Can only call functions and classes.", null);
+        return function.call(this, arguments, false);
       }
+
+      case LoxTrait trait -> throw new RuntimeError(trait.name(), "RuntimeError", "Traits cannot be constructed nor instantiated.", null);
+
+      case null, default -> throw new RuntimeError(expr.paren, "RuntimeError", "Can only call functions and classes.", null);
+    }
   }
 
   @Override
@@ -2046,9 +2053,9 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
 
   @Override
   public Object visitSuperExpr(Expr.Super expr) {
-    int distance = locals.get(expr);
-    LoxClass superclass = (LoxClass) environment.getAt(distance, "super");
-    LoxInstance object = (LoxInstance) environment.getAt(distance - 1, "self");
+    LocalLocation loc = locals.get(expr);
+    LoxClass superclass = (LoxClass) environment.getAt(loc.depth, loc.index);
+    LoxInstance object = (LoxInstance) environment.getAt(loc.depth - 1, 0);
     LoxFunction method = superclass.findMethod(expr.method.lexeme);
 
     if (method == null) {
@@ -2094,18 +2101,18 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
 
   @Override
   public Object visitVariableExpr(Expr.Variable expr) {
-    Object value = environment.get(expr.name);
+    Object value = lookUpVariable(expr.name, expr);
     if (value == uninitialized) {
       throw new RuntimeError(expr.name, "RuntimeError", "Variable must be initialized before use.", null);
     }
 
-    return lookUpVariable(expr.name, expr);
+    return value;
   }
 
   private Object lookUpVariable(Token name, Expr expr) {
-    Integer distance = locals.get(expr);
-    if (distance != null) {
-      return environment.getAt(distance, name.lexeme);
+    LocalLocation loc = locals.get(expr);
+    if (loc != null) {
+      return environment.getAt(loc.depth, loc.index);
     } else {
       return globals.get(name);
     }
@@ -2147,38 +2154,38 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
   }
 
   public static String stringify(Object object) {
-      return switch (object) {
-          case null -> "null";
+    return switch (object) {
+      case null -> "null";
 
-          case Double ignored -> {
-              String text = object.toString();
-              if (text.endsWith(".0")) {
-                  text = text.substring(0, text.length() - 2);
-              }
+      case Double ignored -> {
+        String text = object.toString();
+        if (text.endsWith(".0")) {
+          text = text.substring(0, text.length() - 2);
+        }
 
-              yield text;
+        yield text;
+      }
+
+      case Map<?, ?> dictionary -> {
+        StringBuilder sb = new StringBuilder();
+        sb.append("{ ");
+        boolean first = true;
+        for (Map.Entry<?, ?> entry : dictionary.entrySet()) {
+          if (!first) {
+            sb.append(", ");
           }
+          first = false;
+          sb.append(entry.getKey().toString())
+                  .append(": ")
+                  .append(stringify(entry.getValue()));
+        }
+        sb.append(" }");
 
-          case Map<?, ?> dictionary -> {
-              StringBuilder sb = new StringBuilder();
-              sb.append("{ ");
-              boolean first = true;
-              for (Map.Entry<?, ?> entry : dictionary.entrySet()) {
-                  if (!first) {
-                      sb.append(", ");
-                  }
-                  first = false;
-                  sb.append(entry.getKey().toString())
-                          .append(": ")
-                          .append(stringify(entry.getValue()));
-              }
-              sb.append(" }");
+        yield sb.toString();
+      }
 
-              yield sb.toString();
-          }
-
-          default -> object.toString();
-      };
+      default -> object.toString();
+    };
   }
 
   private Object getValue(Object obj) {
